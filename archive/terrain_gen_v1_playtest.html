@@ -1,0 +1,2724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Procedural World Generator</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #controls-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(40, 40, 40, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10;
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 380px; /* Adjusted width for new controls */
+        }
+        .control-group {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+        }
+        .control-group:last-child {
+            border-bottom: none;
+        }
+        h3 {
+            color: #61dafb;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        input[type="range"], input[type="number"], select, input[type="checkbox"], input[type="color"] {
+            width: calc(100% - 20px);
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #e0e0e0;
+            box-sizing: border-box;
+        }
+        input[type="range"] { padding: 0; }
+        input[type="checkbox"] { width: auto; margin-right: 5px; vertical-align: middle;}
+        input[type="color"] {
+            height: 30px; /* Standard height for color input */
+            padding: 2px; /* Minimal padding for color swatch */
+            margin-bottom: 10px;
+            border: 1px solid #555;
+            background: none; /* Remove default background */
+        }
+
+        button, .file-input-label { 
+            background-color: #555; 
+            color: #e0e0e0;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+            box-sizing: border-box;
+            display: inline-block; 
+            text-align: center; 
+            font-size: 1em; 
+            line-height: normal; 
+        }
+        button:hover, .file-input-label:hover { background-color: #777; }
+        button.action-button { background-color: #61dafb; color: #1a1a1a; }
+        button.action-button:hover { background-color: #82eaff; }
+        button.secondary, .file-input-label.secondary { background-color: #4CAF50; color: white; }
+        button.secondary:hover, .file-input-label.secondary:hover { background-color: #66bb6a; }
+        button.gemini-button { background-color: #8A2BE2; color: white; }
+        button.gemini-button:hover { background-color: #9932CC; }
+        button.theme-button { background-color: #3f51b5; color: white; }
+        button.theme-button:hover { background-color: #5c6bc0; }
+        input[type="file"] { display: none; }
+        .tool-button, .world-terrain-button { width: calc(50% - 5px); margin-bottom: 5px; padding: 8px 10px; font-size: 0.9em; }
+        .world-terrain-button { width: auto; margin-right: 5px; }
+        .tool-button.active { background-color: #61dafb; color: #1a1a1a; border: 2px solid #fff; }
+        .button-row { display: flex; justify-content: space-between; flex-wrap: wrap; }
+        #worldTerrainList div { background-color: #333; padding: 8px; margin-bottom: 5px; border-radius: 4px; border: 1px solid #444; }
+        #worldTerrainList div.active-terrain-item { border-color: #61dafb; box-shadow: 0 0 5px #61dafb; }
+        #worldTerrainList label { font-size: 0.8em; margin-right: 5px; }
+        #worldTerrainList input[type="number"] { width: 60px; padding: 4px; margin-right: 5px; font-size: 0.9em; }
+        #info { position: absolute; bottom: 10px; left: 10px; background-color: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 3px; font-size: 0.8em; }
+        #loading-indicator, #gemini-loading-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5em; color: #fff; background-color: rgba(0,0,0,0.7); padding: 20px; border-radius: 8px; display: none; z-index: 100; }
+        canvas { display: block; cursor: default; } 
+        .critical-error-message { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background-color:rgba(220,53,69,0.9); color:white; padding:10px 15px; border-radius:5px; z-index:10000; font-size: 0.9em; box-shadow: 0 2px 10px rgba(0,0,0,0.2); text-align:center; }
+        .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+        .modal-content { background-color: #282828; color: #e0e0e0; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-header { padding-bottom: 10px; border-bottom: 1px solid #444; font-size: 1.2em; color: #61dafb; }
+        .modal-body { padding-top: 10px; line-height: 1.6; max-height: 300px; overflow-y: auto;}
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: #fff; text-decoration: none; cursor: pointer; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="controls-container">
+        <div class="control-group">
+            <h3>Active Terrain Config</h3>
+            <label for="terrainWidth">Width: <span id="terrainWidthVal">200</span>m</label>
+            <input type="range" id="terrainWidth" min="50" max="500" value="200" step="10">
+            <label for="terrainDepth">Depth: <span id="terrainDepthVal">200</span>m</label>
+            <input type="range" id="terrainDepth" min="50" max="500" value="200" step="10">
+            <label for="segments">Segments: <span id="segmentsVal">100</span></label>
+            <input type="range" id="segments" min="20" max="250" value="100" step="5">
+            <label for="terrainThickness">Thickness: <span id="terrainThicknessVal">10</span>m</label>
+            <input type="range" id="terrainThickness" min="0" max="50" value="10" step="1">
+            <button id="generateLoreButton" class="gemini-button">✨ Generate Custom Lore</button>
+        </div>
+
+           <div class="control-group">
+            <h3>Default Lore & Terrain Themes</h3>
+            <div class="button-row">
+                <button class="theme-button" data-theme="mystic_mountains">Mystic Peaks</button>
+                <button class="theme-button" data-theme="forgotten_desert">Forgotten Desert</button>
+            </div>
+            <div class="button-row">
+                <button class="theme-button" data-theme="sunken_ruins">Sunken Ruins</button>
+                <button class="theme-button" data-theme="crystal_caves">Crystal Caves</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>Active Terrain Noise</h3>
+            <label for="noiseScale">Scale: <span id="noiseScaleVal">70</span></label>
+            <input type="range" id="noiseScale" min="10" max="200" value="70" step="1">
+            <label for="terrainHeightScale">Max Height: <span id="terrainHeightScaleVal">30</span>m</label>
+            <input type="range" id="terrainHeightScale" min="5" max="100" value="30" step="1">
+            <label for="octaves">Octaves: <span id="octavesVal">4</span></label>
+            <input type="range" id="octaves" min="1" max="8" value="4" step="1">
+            <label for="persistence">Persistence: <span id="persistenceVal">0.5</span></label>
+            <input type="range" id="persistence" min="0.1" max="1" value="0.5" step="0.05">
+            <label for="lacunarity">Lacunarity: <span id="lacunarityVal">2.0</span></label>
+            <input type="range" id="lacunarity" min="1.5" max="4" value="2.0" step="0.1">
+        </div>
+
+        <div class="control-group">
+            <h3>Active Terrain Features</h3>
+            <label for="plateauLevel">Plateau Level: <span id="plateauLevelVal">0.0</span></label>
+            <input type="range" id="plateauLevel" min="0" max="1" value="0.0" step="0.05">
+            <label for="plateauSmoothing">Plateau Smooth: <span id="plateauSmoothingVal">0.1</span></label>
+            <input type="range"id="plateauSmoothing" min="0.01" max="0.5" value="0.1" step="0.01">
+            <label for="valleyDepthFactor">Valley Depth: <span id="valleyDepthFactorVal">1.5</span></label>
+            <input type="range" id="valleyDepthFactor" min="1.0" max="5.0" value="1.5" step="0.1">
+            <label for="valleyThreshold">Valley Thresh: <span id="valleyThresholdVal">-0.2</span></label>
+            <input type="range" id="valleyThreshold" min="-1" max="0" value="-0.2" step="0.05">
+            <label for="waterLevel">Water Level: <span id="waterLevelVal">0</span>m</label>
+            <input type="range" id="waterLevel" min="-50" max="50" value="0" step="1">
+        </div>
+        
+        <div class="control-group">
+            <h3>Grid Settings</h3>
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <label for="showGridInput" style="margin-bottom: 0; margin-right: 5px;">Show Grid: </label>
+                <input type="checkbox" id="showGridInput" style="margin-bottom: 0;">
+                <label for="snapYToGridInput" style="margin-bottom: 0; margin-left: 15px; margin-right: 5px;">Snap Y Offset: </label>
+                <input type="checkbox" id="snapYToGridInput" style="margin-bottom: 0;">
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <label for="showCubeRepresentationInput" style="margin-bottom: 0; margin-right: 5px;">Show Cube Rep.: </label>
+                <input type="checkbox" id="showCubeRepresentationInput" style="margin-bottom: 0;">
+            </div>
+            <label for="gridCellSize">Cell Size: <span id="gridCellSizeVal">10</span>m</label>
+            <input type="range" id="gridCellSize" min="5" max="100" value="10" step="5">
+            <label for="gridDisplaySize">Grid Size: <span id="gridDisplaySizeVal">1000</span>m</label>
+            <input type="range" id="gridDisplaySize" min="100" max="2000" value="1000" step="100">
+            <label for="gridColorCenter">Center Line Color:</label>
+            <input type="color" id="gridColorCenter" value="#444444">
+            <label for="gridColorLines">Grid Line Color:</label>
+            <input type="color" id="gridColorLines" value="#888888">
+            <label for="gridOpacity">Grid Opacity: <span id="gridOpacityVal">0.2</span></label>
+            <input type="range" id="gridOpacity" min="0" max="1" value="0.2" step="0.05">
+        </div>
+
+        <div class="control-group">
+            <h3>Camera Controls</h3>
+            <button id="resetCameraButton">Reset Camera</button>
+            <label for="minDistance">Min Zoom: <span id="minDistanceVal">20</span>m</label>
+            <input type="range" id="minDistance" min="1" max="100" value="20" step="1">
+            <label for="maxDistance">Max Zoom: <span id="maxDistanceVal">500</span>m</label>
+            <input type="range" id="maxDistance" min="100" max="1000" value="500" step="10">
+        </div>
+
+        <div class="control-group">
+            <h3>Tools (for Active Terrain)</h3>
+            <button class="tool-button" id="navigateToolButton" data-tool="NONE">Navigate</button>
+            <button class="tool-button" id="moveTerrainToolButton" data-tool="MOVE_TERRAIN">Move Active Terrain</button>
+            <hr style="margin: 10px 0; border-color: #444;">
+            <label for="brushSize">Brush Size: <span id="brushSizeVal">10</span>m</label>
+            <input type="range" id="brushSize" min="1" max="50" value="10" step="1">
+            <label for="sculptStrength" style="margin-top:10px;">Sculpt Strength: <span id="sculptStrengthVal">0.5</span>m</label>
+            <input type="range" id="sculptStrength" min="0.1" max="2" value="0.5" step="0.1">
+            <div class="button-row">
+                <button class="tool-button" data-tool="SCULPT_RAISE">Raise</button>
+                <button class="tool-button" data-tool="SCULPT_LOWER">Lower</button>
+            </div>
+            <div class="button-row">
+                <button class="tool-button" data-tool="SCULPT_SMOOTH">Smooth</button> <button class="tool-button" data-tool="SCULPT_FLATTEN">Flatten</button> </div>
+            <hr style="margin: 10px 0; border-color: #444;">
+            <div class="button-row">
+                <button class="tool-button" data-tool="PAINT" data-type="GRASS">Grass</button>
+                <button class="tool-button" data-tool="PAINT" data-type="SAND">Sand</button>
+            </div>
+            <div class="button-row">
+                <button class="tool-button" data-tool="PAINT" data-type="ROCK">Rock</button>
+                <button class="tool-button" data-tool="PAINT" data-type="SNOW">Snow</button>
+            </div>
+               <div class="button-row">
+                <button class="tool-button" data-tool="PAINT" data-type="LAVA">Lava</button>
+                <button class="tool-button" data-tool="PAINT" data-type="GRAVEL">Gravel</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>Object Placement Tools</h3>
+            <label for="objectPlacementScale">Object Scale: <span id="objectPlacementScaleVal">1.0</span></label>
+            <input type="range" id="objectPlacementScale" min="0.1" max="5.0" value="1.0" step="0.1">
+            <div class="button-row">
+                <button class="tool-button" data-tool="PLACE_OBJECT" data-object-type="TREE">Place Tree</button>
+                <button class="tool-button" data-tool="PLACE_OBJECT" data-object-type="ROCK_OBJ">Place Rock</button>
+            </div>
+            <button id="clearAllPlacedObjectsButton" class="secondary">Clear All Placed Objects</button>
+        </div>
+
+        <div class="control-group">
+            <h3>Undo / Redo</h3>
+            <div class="button-row">
+                <button id="undoButton" disabled>Undo</button>
+                <button id="redoButton" disabled>Redo</button>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>World Management</h3>
+            <label for="addTerrainInput" class="file-input-label secondary">Add Terrain From File</label>
+            <input type="file" id="addTerrainInput" accept=".json">
+            <button id="regenerateActiveButton" class="action-button">Regenerate Active Terrain</button>
+            <button id="saveActiveTerrainButton" class="secondary">Save Active Terrain</button>
+            <hr style="margin: 10px 0; border-color: #444;">
+            <label for="loadWorldInput" class="file-input-label">Load World</label>
+            <input type="file" id="loadWorldInput" accept=".world.json">
+            <button id="saveWorldButton" class="secondary">Save World</button>
+            <div id="worldTerrainList" style="margin-top:10px; max-height: 150px; overflow-y:auto; border: 1px solid #555; padding:5px;">
+                </div>
+        </div>
+    </div>
+
+    <div id="loading-indicator">Generating Terrain...</div>
+    <div id="gemini-loading-indicator">✨ Generating Lore...</div>
+
+    <div id="loreModal" class="modal"> <div class="modal-content"> <div class="modal-header"> <span class="close-button" id="closeLoreModal">&times;</span> <h2>Terrain Lore</h2> </div> <div class="modal-body"> <p id="loreText">Loading lore...</p> </div> </div> </div>
+    <div id="info">Double-click terrain to focus. Left-click to paint/sculpt/move/place objects. Right-click to pan. (Units are in meters)</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script>console.log('Diag three.js: typeof window.THREE =', typeof window.THREE);</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+    <script>console.log('Diag simplex-noise: typeof window.SimplexNoise =', typeof window.SimplexNoise);</script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script>console.log('Diag OrbitControls: typeof window.THREE?.OrbitControls =', typeof window.THREE?.OrbitControls);</script>
+
+    <script> 
+        // --- Global Scope Variables ---
+        let scene, camera, renderer, controls;
+        let simplex; // SimplexNoise instance for procedural generation
+        let worldTerrains = []; // Array to hold all terrain instances in the world
+        let activeTerrainIndex = -1; // Index of the currently active terrain for editing
+        let worldGroup; // A THREE.Group to hold all terrain meshes and their objects
+        let gridHelperVisual; // THREE.GridHelper instance for visual grid
+
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const geminiLoadingIndicator = document.getElementById('gemini-loading-indicator');
+        const loreModal = document.getElementById('loreModal');
+        const closeLoreModalButton = document.getElementById('closeLoreModal');
+        const loreTextElement = document.getElementById('loreText');
+        let animationFrameCount = 0; // Counter for animation frames, used for initial logging
+
+        // Undo/Redo System Variables
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_HISTORY_STATES = 20; // Limit the number of states in history
+
+        // Tool modes for user interaction
+        const TOOL_MODES = { NONE: 'NONE', PAINT: 'PAINT', SCULPT_RAISE: 'SCULPT_RAISE', SCULPT_LOWER: 'SCULPT_LOWER', SCULPT_SMOOTH: 'SCULPT_SMOOTH', SCULPT_FLATTEN: 'SCULPT_FLATTEN', MOVE_TERRAIN: 'MOVE_TERRAIN', PLACE_OBJECT: 'PLACE_OBJECT' };
+        // Enum for different terrain types (materials)
+        const TERRAIN_TYPES = { SAND: 0, GRASS: 1, ROCK: 2, SNOW: 3, LAVA: 4, GRAVEL: 5 };
+        // Color mapping for terrain types
+        const TERRAIN_COLORS = {
+            [TERRAIN_TYPES.SAND]: new THREE.Color(0xC2B280),
+            [TERRAIN_TYPES.GRASS]: new THREE.Color(0x559955),
+            [TERRAIN_TYPES.ROCK]: new THREE.Color(0x888888),
+            [TERRAIN_TYPES.SNOW]: new THREE.Color(0xFFFFFF),
+            [TERRAIN_TYPES.LAVA]: new THREE.Color(0xFF4500),
+            [TERRAIN_TYPES.GRAVEL]: new THREE.Color(0xA9A9A9)
+        };
+        const SIDE_BOTTOM_COLOR = new THREE.Color(0x654321); // Color for the sides and bottom of terrain
+        // Enum for different types of placed objects
+        const PLACED_OBJECT_TYPES = { TREE: 'tree', ROCK_OBJ: 'rock_obj' };
+        
+        let currentToolMode = TOOL_MODES.NONE; // Currently selected tool
+        let currentPaintType = TERRAIN_TYPES.GRASS; // Current terrain type for painting
+        let currentPlaceObjectType = PLACED_OBJECT_TYPES.TREE; // Current object type for placement tool
+        let brushSize = 10; // Radius of the sculpting/painting brush
+        let sculptStrength = 0.5; // Amount of height change per sculpting interaction
+        let objectPlacementScale = 1.0; // Scale factor for placed objects
+        let isInteracting = false; // True when left mouse button is held down for sculpting/painting
+        let isMovingTerrainState = false; // True when left mouse button is held down for moving terrain
+        const raycaster = new THREE.Raycaster(); // Used for picking objects in 3D space
+        const mouse = new THREE.Vector2(); // Stores mouse coordinates
+
+        const initialCameraPosition = new THREE.Vector3(80, 80, 80); // Default camera position
+        const initialCameraTarget = new THREE.Vector3(0, 0, 0); // Default camera look-at target
+        let newTargetPosition = null; // Target for camera focus transition
+        let isFocusTransitioning = false; // True if camera is smoothly moving to a new target
+        const focusSmoothingFactor = 0.08; // Smoothing factor for camera transition
+
+        // Default configuration for terrain generation and world settings
+        const defaultConfig = {
+            terrainWidth: 200, terrainDepth: 200, segments: 100, terrainThickness: 10,
+            noiseScale: 70, terrainHeightScale: 30, octaves: 4, persistence: 0.5, lacunarity: 2.0,
+            plateauLevel: 0.0, plateauSmoothing: 0.1, valleyDepthFactor: 1.5, valleyThreshold: -0.2, 
+            waterLevel: 0,
+            treePlacementProbability: 0.02, rockPlacementProbability: 0.01,
+            minDistance: 20, maxDistance: 500,
+            gridCellSize: 10, gridDisplaySize: 1000, showGrid: true, snapYToGrid: false,
+            gridColorCenter: 0x444444, gridColorLines: 0x888888, gridOpacity: 0.2, // Grid appearance defaults (hex numbers)
+            skyColor: 0x87CEEB, // Sky blue
+            ambientIntensity: 0.6,
+            dirColor: 0xffffff,
+            dirIntensity: 0.8,
+            showCubeRepresentation: false // New default for cube representation
+        };
+        
+        // Predefined lore themes with associated terrain configurations and lore prompts
+        const LORE_THEMES = {
+            mystic_mountains: {
+                name: "Mystic Peaks",
+                config: {
+                    noiseScale: 100, terrainHeightScale: 80, octaves: 6, persistence: 0.6, lacunarity: 2.2,
+                    plateauLevel: 0.0, plateauSmoothing: 0.1, valleyDepthFactor: 2.0, valleyThreshold: -0.5,
+                    waterLevel: -10,
+                    treePlacementProbability: 0.005, rockPlacementProbability: 0.05
+                },
+                lorePrompt: "Generate lore (2-4 sentences) for a majestic, ancient mountain range, hinting at hidden temples or mythical creatures. "
+            },
+            forgotten_desert: {
+                name: "Forgotten Desert",
+                config: {
+                    noiseScale: 40, terrainHeightScale: 15, octaves: 3, persistence: 0.4, lacunarity: 2.0,
+                    plateauLevel: 0.2, plateauSmoothing: 0.2, valleyDepthFactor: 1.2, valleyThreshold: -0.1,
+                    waterLevel: -30,
+                    treePlacementProbability: 0.001, rockPlacementProbability: 0.005
+                },
+                lorePrompt: "Generate lore (2-4 sentences) for a vast, arid desert, suggesting ancient civilizations buried beneath the sands or nomadic tribes. "
+            },
+            sunken_ruins: {
+                name: "Sunken Ruins",
+                config: {
+                    noiseScale: 60, terrainHeightScale: 25, octaves: 5, persistence: 0.5, lacunarity: 2.1,
+                    plateauLevel: 0.0, plateauSmoothing: 0.1, valleyDepthFactor: 1.8, valleyThreshold: -0.3,
+                    waterLevel: 5, // Higher water level for submerged terrain
+                    treePlacementProbability: 0.002, rockPlacementProbability: 0.01
+                },
+                lorePrompt: "Generate lore (2-4 sentences) for mysterious ruins partially submerged in water, hinting at a lost civilization or a cataclysmic event. "
+            },
+            crystal_caves: {
+                name: "Crystal Caves",
+                config: {
+                    noiseScale: 50, terrainHeightScale: 40, octaves: 4, persistence: 0.55, lacunarity: 2.3,
+                    plateauLevel: 0.0, plateauSmoothing: 0.1, valleyDepthFactor: 2.5, valleyThreshold: -0.6,
+                    waterLevel: -20,
+                    treePlacementProbability: 0.000, rockPlacementProbability: 0.08 // More rocks, fewer trees
+                },
+                lorePrompt: "Generate lore (2-4 sentences) for a network of shimmering crystal caves, suggesting magical properties or a source of rare minerals. "
+            }
+        };
+        
+        // --- Utility Functions ---
+        /**
+         * Safely gets an HTML element by its ID.
+         * @param {string} id - The ID of the element to retrieve.
+         * @returns {HTMLElement|null} The element or null if not found.
+         */
+        function getElement(id) { 
+            return document.getElementById(id); 
+        }
+
+        /**
+         * Creates a deep copy of a JavaScript object.
+         * @param {object} obj - The object to copy.
+         * @returns {object} A new, deep-copied object.
+         */
+        function deepCopy(obj) { 
+            return JSON.parse(JSON.stringify(obj)); 
+        }
+
+        /**
+         * Generates a unique ID string.
+         * @param {string} prefix - A prefix for the ID (e.g., 't_').
+         * @returns {string} A unique ID.
+         */
+        function generateUniqueId(prefix = 'id') { 
+            return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`; 
+        }
+
+        /**
+         * Updates the value of an input element and its associated span for display.
+         * @param {string} inputId - The ID of the input element.
+         * @param {number|string} value - The new value.
+         * @param {boolean} isColor - True if the input is a color picker.
+         */
+        function updateInputAndSpan(inputId, value, isColor = false) {
+            const inputElement = getElement(inputId);
+            const spanElement = getElement(inputId + 'Val');
+            if (inputElement) { 
+                if (isColor) {
+                    // Convert hex number to hex string for color input value
+                    inputElement.value = `#${new THREE.Color(value).getHexString()}`;
+                } else {
+                    inputElement.value = value;
+                }
+            }
+            if (spanElement && !isColor) { 
+                spanElement.textContent = value; 
+            } // Don't update span for color
+        }
+        
+        /**
+         * Triggers a download of JSON data as a file.
+         * @param {object} data - The JSON data to download.
+         * @param {string} filename - The desired filename.
+         */
+        function triggerJSONDownload(data, filename) {
+            try {
+                const jsonString = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                displayGlobalError(`Failed to trigger download for ${filename}: ${e.message}`, "download-err");
+            }
+        }
+
+        /**
+         * Reads a file as JSON asynchronously.
+         * @param {File} file - The file to read.
+         * @returns {Promise<object>} A promise that resolves with the parsed JSON data.
+         */
+        async function readFileAsJSON(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const jsonData = JSON.parse(event.target.result);
+                        resolve(jsonData);
+                    } catch (error) {
+                        reject(new Error(`Invalid JSON file: ${error.message}`));
+                    }
+                };
+                reader.onerror = (event) => reject(new Error(`File read error: ${event.target.error}`));
+                reader.readAsText(file);
+            });
+        }
+        
+        /**
+         * Disposes of Three.js objects to free up memory.
+         * Recursively disposes geometries, materials, and textures.
+         * @param {THREE.Object3D} object - The Three.js object to dispose.
+         */
+        function disposeThreeObject(object) {
+            if (!object) return;
+            // Dispose of geometry
+            if (object.geometry) object.geometry.dispose();
+            // Dispose of material(s) and their maps (textures)
+            if (object.material) {
+                if (Array.isArray(object.material)) {
+                    object.material.forEach(material => {
+                        if (material.map) material.map.dispose();
+                        material.dispose();
+                    });
+                } else {
+                    if (object.material.map) object.material.map.dispose();
+                    object.material.dispose();
+                }
+            }
+            // Recursively dispose children
+            if (object.children && object.children.length > 0) {
+                while (object.children.length > 0) {
+                    disposeThreeObject(object.children[0]);
+                    object.remove(object.children[0]);
+                }
+            }
+        }
+
+        /**
+         * Disposes of a terrain instance's Three.js objects.
+         * @param {object} terrainInstance - The terrain instance object.
+         */
+        function disposeTerrainInstance(terrainInstance) {
+            if (terrainInstance.mesh) {
+                worldGroup.remove(terrainInstance.mesh);
+                disposeThreeObject(terrainInstance.mesh);
+                terrainInstance.mesh = null;
+            }
+            if (terrainInstance.waterMesh) {
+                worldGroup.remove(terrainInstance.waterMesh);
+                disposeThreeObject(terrainInstance.waterMesh);
+                terrainInstance.waterMesh = null;
+            }
+            if (terrainInstance.objectsGroup) {
+                worldGroup.remove(terrainInstance.objectsGroup);
+                disposeThreeObject(terrainInstance.objectsGroup);
+                terrainInstance.objectsGroup = null;
+            }
+            // Also dispose of cube representation if it exists for this terrain
+            if (terrainInstance.cubeInstancesMesh) {
+                worldGroup.remove(terrainInstance.cubeInstancesMesh);
+                disposeThreeObject(terrainInstance.cubeInstancesMesh);
+                terrainInstance.cubeInstancesMesh = null;
+            }
+        }
+
+        // --- Gemini API Helper ---
+        /**
+         * Calls the Gemini API to generate text.
+         * @param {string} promptText - The prompt to send to the API.
+         * @param {string} purposeDescription - A description of the API call's purpose for logging/error messages.
+         * @returns {Promise<string|null>} A promise that resolves with the generated text, or null if an error occurs.
+         */
+        async function callGeminiAPI(promptText, purposeDescription = "AI operation") { 
+            console.log(`LOG: Calling Gemini API for: ${purposeDescription}`);
+            showLoading(true); // Show Gemini-specific loading indicator
+
+            // The API key is provided by the Canvas environment.
+            // DO NOT modify this. If you want to use models other than gemini-2.0-flash,
+            // you might need to provide an API key here, but for Canvas, leave it as is.
+            const apiKey = ""; 
+            if (!apiKey) {
+                const err = "Gemini API key missing. Cannot generate lore.";
+                console.error("LOG: " + err);
+                displayGlobalError(err, "gemini-key-err");
+                hideLoading(true);
+                return null;
+            }
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const payload = { 
+                contents: [{ role: "user", parts: [{ text: promptText }] }] 
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API call failed with status ${response.status}: ${errorBody}`);
+                }
+
+                const result = await response.json();
+
+                // Check for valid content in the response
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0 &&
+                    result.candidates[0].content.parts[0].text) {
+                    return result.candidates[0].content.parts[0].text.trim();
+                } else if (result.promptFeedback && result.promptFeedback.blockReason) {
+                    // Handle cases where the prompt was blocked
+                    throw new Error(`Prompt blocked by safety settings: ${result.promptFeedback.blockReason}.`);
+                } else {
+                    throw new Error("No valid content found in API response.");
+                }
+            } catch (err) {
+                console.error(`LOG: Gemini API Error (${purposeDescription}):`, err);
+                displayGlobalError(`Gemini API Error: ${err.message}`, "gemini-api-err");
+                return null;
+            } finally {
+                hideLoading(true); // Hide loading indicator regardless of success or failure
+            }
+        }
+
+        // --- Initialization Functions ---
+        /**
+         * Initializes the core Three.js components: scene, camera, renderer.
+         */
+        function initThreeJSCore() { 
+            if (typeof THREE === 'undefined') {
+                displayGlobalError("CRITICAL: THREE.js library not found. Please check script imports.", "threejs-missing");
+                throw new Error("THREE.js library not found.");
+            }
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(defaultConfig.skyColor);
+            scene.fog = new THREE.Fog(defaultConfig.skyColor, 100, 600); // Add fog for depth perception
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable antialiasing for smoother edges
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true; // Enable shadow mapping
+            document.body.appendChild(renderer.domElement);
+
+            worldGroup = new THREE.Group(); // Group to hold all terrains and objects
+            scene.add(worldGroup);
+
+            // A ground plane for raycasting when moving terrain
+            // This plane is invisible and at y=0, used to project mouse coordinates onto the 3D world.
+            // It's not added to the scene directly.
+            groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); 
+        }
+
+        /**
+         * Initializes external libraries like SimplexNoise.
+         */
+        function initExternalLibraries() { 
+            try {
+                if (typeof window.SimplexNoise === 'function') {
+                    simplex = new window.SimplexNoise();
+                } else {
+                    throw new Error("SimplexNoise library not found.");
+                }
+            } catch (e) {
+                displayGlobalError(`CRITICAL: SimplexNoise initialization failed: ${e.message}`, "simplex-err");
+                // Fallback: if SimplexNoise is not available, provide a dummy object
+                // to prevent errors in noise generation, though terrain will be flat.
+                simplex = { noise2D: () => 0 }; 
+            }
+        }
+
+        /**
+         * Sets up the lighting in the scene (ambient and directional).
+         */
+        function initLighting() { 
+            const ambientLight = new THREE.AmbientLight(0xffffff, defaultConfig.ambientIntensity);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(defaultConfig.dirColor, defaultConfig.dirIntensity);
+            directionalLight.position.set(50, 100, 50); // Position the light source
+            directionalLight.castShadow = true; // Enable shadows from this light
+            directionalLight.shadow.mapSize.set(2048, 2048); // High resolution shadows
+            // Adjust shadow camera to cover a wider area
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            directionalLight.shadow.camera.left = -200;
+            directionalLight.shadow.camera.right = 200;
+            directionalLight.shadow.camera.top = 200;
+            directionalLight.shadow.camera.bottom = -200;
+            scene.add(directionalLight);
+        }
+
+        /**
+         * Initializes OrbitControls for camera interaction.
+         */
+        function initControls() { 
+            try {
+                if (THREE && typeof THREE.OrbitControls === 'function') {
+                    controls = new THREE.OrbitControls(camera, renderer.domElement);
+                    controls.enableDamping = true; // Enable smooth camera movement
+                    controls.dampingFactor = 0.05;
+                    controls.screenSpacePanning = true; // Enable panning in screen space
+                    controls.minDistance = defaultConfig.minDistance;
+                    controls.maxDistance = defaultConfig.maxDistance;
+                    resetCamera(); // Set initial camera position
+                } else {
+                    throw new Error("OrbitControls not found. Please check script imports.");
+                }
+            } catch (e) {
+                displayGlobalError(`CRITICAL: OrbitControls initialization failed: ${e.message}`, "orbitctrl-err");
+            }
+        }
+
+        /**
+         * Sets up all necessary event listeners for user interaction and window resizing.
+         */
+        function initEventListeners() { 
+            renderer.domElement.addEventListener('mousedown', onTerrainMouseDown);
+            renderer.domElement.addEventListener('mousemove', onTerrainMouseMove);
+            renderer.domElement.addEventListener('mouseup', onTerrainMouseUp);
+            renderer.domElement.addEventListener('dblclick', onTerrainDoubleClick);
+            // Prevent context menu on right-click to allow custom right-click behavior (panning)
+            renderer.domElement.addEventListener('contextmenu', e => e.preventDefault()); 
+            window.addEventListener('resize', onWindowResize);
+
+            // Modal close button and outside click listener
+            if (closeLoreModalButton) {
+                closeLoreModalButton.onclick = function() {
+                    loreModal.style.display = "none";
+                };
+            }
+            if (loreModal) {
+                window.onclick = function(event) {
+                    if (event.target == loreModal) {
+                        loreModal.style.display = "none";
+                    }
+                };
+            }
+        }
+        
+        /**
+         * Initializes the default world state, creating a default terrain if none exists.
+         */
+        function initDefaultWorldState() { 
+            if (worldTerrains.length === 0) {
+                console.log("LOG: initDefaultWorldState() - Creating default terrain.");
+                const newId = generateUniqueId('t_init');
+                const newTerrainConfig = deepCopy(defaultConfig);
+                const newTerrainOffset = { x: 0, y: 0, z: 0 };
+                const newTerrainInstance = createNewTerrainInstance(newId, newTerrainConfig, newTerrainOffset);
+                
+                worldTerrains.push(newTerrainInstance);
+                activeTerrainIndex = 0; // Set the newly created terrain as active
+
+                showLoading(); // Show loading indicator while generating
+                // Use a small delay to allow loading indicator to render
+                setTimeout(() => {
+                    createOrUpdateTerrainInstance(newTerrainInstance, null, null); // Generate terrain mesh
+                    placeObjects(newTerrainInstance); // Place objects on the terrain (procedural)
+                    hideLoading(); // Hide loading indicator
+                    renderWorldTerrainList(); // Update the list of terrains in the UI
+                    updateUIForActiveTerrain(); // Update UI controls to reflect active terrain's settings
+                    saveStateToHistory(); // Save initial state to undo history
+                }, 50);
+            } else {
+                // If terrains already exist (e.g., loaded from a world file), just update UI
+                updateUIForActiveTerrain();
+                renderWorldTerrainList();
+                saveStateToHistory(); // Save initial state to undo history
+            }
+        }
+
+        /**
+         * Main initialization function, called on window load.
+         * Sets up Three.js, controls, event listeners, and default world state.
+         */
+        function init() { 
+            console.log("LOG: Main init() sequence started.");
+            initThreeJSCore();
+            initExternalLibraries();
+            initLighting();
+            initControls();
+            initEventListeners();
+            setupUI(); // Setup UI element listeners
+            updateGridHelper(); // Initialize grid
+            initDefaultWorldState(); // Create initial terrain or load existing
+            animate(); // Start the animation loop
+            console.log("LOG: Main init() sequence finished.");
+        }
+        
+        // --- UI Helper Functions ---
+        /**
+         * Updates or creates the Three.js GridHelper based on current settings.
+         */
+        function updateGridHelper() { 
+            // Remove existing grid helper if it exists
+            if (gridHelperVisual) { 
+                scene.remove(gridHelperVisual); 
+                disposeThreeObject(gridHelperVisual); 
+                gridHelperVisual = null; 
+            }
+            // Create new grid helper if showGrid is true and THREE is available
+            if (defaultConfig.showGrid && THREE) {
+                gridHelperVisual = new THREE.GridHelper(
+                    defaultConfig.gridDisplaySize, // Size of the grid
+                    defaultConfig.gridDisplaySize / defaultConfig.gridCellSize, // Divisions
+                    new THREE.Color(defaultConfig.gridColorCenter), // Center line color
+                    new THREE.Color(defaultConfig.gridColorLines)  // Grid line color
+                );
+                if (gridHelperVisual.material) { 
+                    gridHelperVisual.material.opacity = defaultConfig.gridOpacity;
+                    gridHelperVisual.material.transparent = true;
+                }
+                scene.add(gridHelperVisual);
+            }
+        }
+        
+        /**
+         * Binds an HTML input element to a configuration property, updating UI and config on change.
+         * @param {string} configKey - The key of the configuration property.
+         * @param {string} inputId - The ID of the HTML input element.
+         * @param {object} options - Options for binding (isInteger, isCheckbox, isColor, targetObjectPath, callback, min, max, step).
+         */
+        function bindConfigInput(configKey, inputId, options = {}) {
+            const { isInteger = false, isCheckbox = false, isColor = false, targetObjectPath, callback, min, max, step } = options;
+            const inputElement = getElement(inputId);
+            if (!inputElement) { 
+                console.warn(`bindConfigInput: Element "${inputId}" not found.`); 
+                return; 
+            }
+        
+            let initialValue;
+            const activeTerrain = getActiveTerrain();
+
+            // Determine where to get the initial value from
+            if (targetObjectPath === 'defaultConfig') initialValue = defaultConfig[configKey];
+            else if (targetObjectPath === 'activeTerrain.config' && activeTerrain) initialValue = activeTerrain.config[configKey];
+            else if (targetObjectPath === 'globalVar') {
+                if (configKey === 'brushSize') initialValue = brushSize;
+                else if (configKey === 'sculptStrength') initialValue = sculptStrength;
+                else if (configKey === 'objectPlacementScale') initialValue = objectPlacementScale; // New global variable
+                else initialValue = defaultConfig[configKey]; // Fallback to defaultConfig
+            } else initialValue = defaultConfig[configKey]; // Default fallback
+
+            // Set initial value for the input element
+            if (isCheckbox) inputElement.checked = initialValue;
+            else {
+                inputElement.value = isColor ? `#${new THREE.Color(initialValue).getHexString()}` : initialValue;
+                if (min !== undefined) inputElement.min = min; 
+                if (max !== undefined) inputElement.max = max; 
+                if (step !== undefined) inputElement.step = step;
+                updateInputAndSpan(inputId, initialValue, isColor);
+            }
+        
+            // Add event listener for input changes
+            inputElement.addEventListener('input', (event) => {
+                let value;
+                if (isCheckbox) {
+                    value = event.target.checked;
+                } else if (isColor) {
+                    value = new THREE.Color(event.target.value).getHex(); // Store as hex number
+                } else {
+                    value = isInteger ? parseInt(event.target.value) : parseFloat(event.target.value);
+                }
+                
+                // Update the displayed value in the span (if not a checkbox or color)
+                if (!isCheckbox && !isColor) updateInputAndSpan(inputId, value);
+                else if (isColor) updateInputAndSpan(inputId, value, true); // Update color input visually
+        
+                // Update the corresponding configuration object or global variable
+                if (targetObjectPath === 'defaultConfig') defaultConfig[configKey] = value;
+                else if (targetObjectPath === 'activeTerrain.config' && activeTerrain) activeTerrain.config[configKey] = value;
+                else if (targetObjectPath === 'globalVar') {
+                    if (configKey === 'brushSize') brushSize = value;
+                    else if (configKey === 'sculptStrength') sculptStrength = value;
+                    else if (configKey === 'objectPlacementScale') objectPlacementScale = value; // Update new global variable
+                }
+        
+                // Update OrbitControls properties if related to camera distance
+                if (controls && configKey === 'minDistance') controls.minDistance = value;
+                if (controls && configKey === 'maxDistance') controls.maxDistance = value;
+
+                // Execute callback function if provided
+                if (callback) callback(value, activeTerrain);
+            });
+        }
+
+        /**
+         * Sets up listeners for all configuration input elements.
+         */
+        function setupConfigInputListeners() {
+            // Bind terrain configuration controls
+            const terrainConfigKeys = ['terrainWidth','terrainDepth','segments','terrainThickness','noiseScale','terrainHeightScale','octaves','persistence','lacunarity','plateauLevel','plateauSmoothing','valleyDepthFactor','valleyThreshold','waterLevel'];
+            terrainConfigKeys.forEach(key => bindConfigInput(key, key, {
+                targetObjectPath:'activeTerrain.config', 
+                isInteger:['segments','octaves'].includes(key), 
+                callback:(val, activeTerrain)=>{
+                    // Regenerate terrain if thickness changes
+                    if(activeTerrain && key === 'terrainThickness') {
+                        regenerateActiveTerrain();
+                    }
+                }
+            }));
+
+            // Bind tool-specific controls
+            bindConfigInput('brushSize','brushSize',{targetObjectPath:'globalVar'});
+            bindConfigInput('sculptStrength','sculptStrength',{targetObjectPath:'globalVar'});
+            bindConfigInput('objectPlacementScale','objectPlacementScale',{targetObjectPath:'globalVar'}); // Bind new object scale input
+
+            // Bind camera controls
+            bindConfigInput('minDistance','minDistance',{targetObjectPath:'activeTerrain.config'});
+            bindConfigInput('maxDistance','maxDistance',{targetObjectPath:'activeTerrain.config'});
+
+            // Bind grid settings
+            bindConfigInput('gridCellSize','gridCellSize',{targetObjectPath:'defaultConfig',callback:updateGridHelper});
+            bindConfigInput('gridDisplaySize','gridDisplaySize',{targetObjectPath:'defaultConfig',callback:updateGridHelper});
+            bindConfigInput('showGrid','showGridInput',{targetObjectPath:'defaultConfig',isCheckbox:true,callback:updateGridHelper});
+            bindConfigInput('snapYToGrid','snapYToGridInput',{targetObjectPath:'defaultConfig',isCheckbox:true});
+            // New: Bind showCubeRepresentation input
+            bindConfigInput('showCubeRepresentation', 'showCubeRepresentationInput', {
+                targetObjectPath: 'defaultConfig',
+                isCheckbox: true,
+                callback: (val, activeTerrain) => {
+                    // When cube representation is toggled, regenerate the active terrain
+                    // to switch between mesh and cube rendering.
+                    if (activeTerrain) {
+                        regenerateActiveTerrain();
+                    }
+                }
+            });
+            bindConfigInput('gridColorCenter','gridColorCenter',{targetObjectPath:'defaultConfig',isColor:true,callback:updateGridHelper});
+            bindConfigInput('gridColorLines','gridColorLines',{targetObjectPath:'defaultConfig',isColor:true,callback:updateGridHelper});
+            bindConfigInput('gridOpacity','gridOpacity',{targetObjectPath:'defaultConfig',min:0,max:1,step:0.01,callback:updateGridHelper});
+        }
+        
+        /**
+         * Sets up listeners for tool selection buttons.
+         */
+        function setupToolButtonListeners() {
+            const toolButtons = document.querySelectorAll('.tool-button');
+            const navigateButton = getElement('navigateToolButton');
+
+            /**
+             * Sets the active state for tool buttons and updates cursor/controls.
+             * @param {HTMLElement} activeButton - The button to set as active.
+             */
+            function setActiveToolButton(activeButton) {
+                toolButtons.forEach(button => button.classList.remove('active'));
+                if (activeButton) {
+                    activeButton.classList.add('active');
+                }
+
+                // Update cursor style based on current tool mode
+                if (renderer && renderer.domElement) {
+                    renderer.domElement.style.cursor = (currentToolMode !== TOOL_MODES.NONE) ? 
+                        (currentToolMode === TOOL_MODES.MOVE_TERRAIN ? 'move' : 'crosshair') : 
+                        'default';
+                }
+
+                // Adjust OrbitControls' left mouse button behavior
+                // If in NONE mode, left click rotates camera. Otherwise, it's used by the tool.
+                if (controls && THREE) {
+                    controls.mouseButtons.LEFT = (currentToolMode === TOOL_MODES.NONE) ? THREE.MOUSE.ROTATE : -1;
+                }
+            }
+
+            // Add click listeners to all tool buttons
+            toolButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tool = button.dataset.tool;
+                    const type = button.dataset.type; // For PAINT tool
+                    const objectType = button.dataset.objectType; // For PLACE_OBJECT tool
+
+                    currentToolMode = TOOL_MODES[tool] || TOOL_MODES.NONE;
+                    setActiveToolButton(button);
+
+                    if (currentToolMode === TOOL_MODES.PAINT) {
+                        currentPaintType = TERRAIN_TYPES[type];
+                    } else if (currentToolMode === TOOL_MODES.PLACE_OBJECT) {
+                        currentPlaceObjectType = PLACED_OBJECT_TYPES[objectType];
+                    }
+                });
+            });
+
+            // Set initial active tool button (Navigate by default)
+            if (navigateButton) {
+                setActiveToolButton(navigateButton);
+            }
+        }
+
+        /**
+         * Sets up listeners for file operation buttons (save, load, add terrain).
+         */
+        function setupFileOperationListeners() {
+            getElement('regenerateActiveButton')?.addEventListener('click', regenerateActiveTerrain);
+            getElement('saveActiveTerrainButton')?.addEventListener('click', saveActiveTerrainData);
+            getElement('addTerrainInput')?.addEventListener('change', addTerrainFromFile);
+            getElement('resetCameraButton')?.addEventListener('click', resetCamera);
+            getElement('saveWorldButton')?.addEventListener('click', saveWorldData);
+            getElement('loadWorldInput')?.addEventListener('change', loadWorldData);
+            getElement('clearAllPlacedObjectsButton')?.addEventListener('click', clearAllPlacedObjects); 
+            getElement('undoButton')?.addEventListener('click', undo); // New Undo button listener
+            getElement('redoButton')?.addEventListener('click', redo); // New Redo button listener
+        }
+
+        /**
+         * Sets up listeners for lore generation and theme selection buttons.
+         */
+        function setupThemeAndLoreListeners() {
+            getElement('generateLoreButton')?.addEventListener('click', () => handleGenerateLoreClick());
+            document.querySelectorAll('.theme-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    applyLoreTheme(button.dataset.theme);
+                });
+            });
+        }
+
+        /**
+         * Consolidates all UI setup functions.
+         */
+        function setupUI() { 
+            setupConfigInputListeners(); 
+            setupToolButtonListeners(); 
+            setupFileOperationListeners(); 
+            setupThemeAndLoreListeners(); 
+            updateUndoRedoButtons(); // Initialize button states
+        }
+        
+        /**
+         * Applies a predefined lore theme to the active terrain or creates a new one.
+         * @param {string} themeKey - The key of the theme from LORE_THEMES.
+         */
+        function applyLoreTheme(themeKey) { 
+            const theme = LORE_THEMES[themeKey];
+            if (!theme) {
+                displayGlobalError(`Theme "${themeKey}" not found.`, "theme-nf");
+                return;
+            }
+
+            let activeTerrain = getActiveTerrain();
+            if (!activeTerrain) {
+                // If no active terrain, create a new one with the theme's config
+                const newTerrainInstance = createNewTerrainInstance(
+                    `t_theme_${themeKey}_${Date.now()}`,
+                    { ...defaultConfig, ...theme.config }, // Merge theme config with default
+                    { x: 0, y: 0, z: 0 }
+                );
+                worldTerrains.push(newTerrainInstance);
+                activeTerrainIndex = worldTerrains.length - 1;
+                activeTerrain = newTerrainInstance;
+            } else {
+                // If active terrain exists, apply theme config to it
+                Object.assign(activeTerrain.config, theme.config);
+            }
+
+            updateUIForActiveTerrain(); // Update UI to reflect new config
+            showLoading(); // Show loading indicator
+            // Use a small delay to allow loading indicator to render
+            setTimeout(() => {
+                createOrUpdateTerrainInstance(activeTerrain, null, null);
+                // When applying a theme, we want to regenerate procedural objects
+                // and clear any manual objects.
+                clearAllPlacedObjects(activeTerrain); // Clear any existing objects first
+                placeObjects(activeTerrain); // Then place new procedural objects
+                hideLoading();
+                renderWorldTerrainList();
+                handleGenerateLoreClick(theme.lorePrompt); // Generate lore based on theme's prompt
+                saveStateToHistory(); // Save state after applying theme
+            }, 50);
+        }
+
+        /**
+         * Resets the camera position and target to their initial default values.
+         */
+        function resetCamera() {
+            if (camera && controls) {
+                camera.position.copy(initialCameraPosition);
+                controls.target.copy(initialCameraTarget);
+                controls.update(); // Update controls to apply changes
+                newTargetPosition = null; // Clear any ongoing focus transition
+                isFocusTransitioning = false;
+                // No history save for camera reset alone, as it's a view change, not content change
+            }
+        }
+
+        /**
+         * Shows or hides the loading indicator.
+         * @param {boolean} isGemini - True if showing/hiding the Gemini-specific indicator.
+         */
+        function showLoading(isGemini = false) {
+            const indicator = isGemini ? geminiLoadingIndicator : loadingIndicator;
+            if (indicator) {
+                indicator.style.display = 'block';
+            }
+        }
+
+        /**
+         * Hides the loading indicator.
+         * @param {boolean} isGemini - True if hiding the Gemini-specific indicator.
+         */
+        function hideLoading(isGemini = false) {
+            const indicator = isGemini ? geminiLoadingIndicator : loadingIndicator;
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+        }
+
+        let errorTimeoutId = null; // To manage the timeout for error messages
+
+        /**
+         * Displays a global error message at the bottom of the screen.
+         * @param {string} msg - The error message to display.
+         * @param {string} id - A unique ID for the error message element.
+         */
+        function displayGlobalError(msg, id = 'gen-err') {
+            const errorElementId = `${id}-msg`;
+            let errorDiv = getElement(errorElementId);
+
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.id = errorElementId;
+                errorDiv.className = 'critical-error-message';
+                document.body.appendChild(errorDiv);
+            }
+            errorDiv.textContent = msg;
+            errorDiv.style.display = 'block'; // Ensure it's visible
+            console.error(`ERROR [${id}]: ${msg}`);
+
+            // Clear any existing timeout to prevent premature hiding
+            if (errorTimeoutId) {
+                clearTimeout(errorTimeoutId);
+            }
+            // Hide the error message after 5 seconds
+            errorTimeoutId = setTimeout(() => {
+                if (errorDiv) {
+                    errorDiv.style.display = 'none';
+                }
+            }, 5000);
+        }
+
+        /**
+         * Applies configuration settings to the UI input elements.
+         * @param {object} configObject - The configuration object to apply.
+         * @param {object} toolSettingsObject - The tool settings object to apply.
+         */
+        function applyConfigToUI(configObject, toolSettingsObject) {
+            // Apply terrain and general config settings
+            for (const key in configObject) {
+                if (configObject.hasOwnProperty(key)) {
+                    if (['showGrid', 'snapYToGrid', 'showCubeRepresentation'].includes(key)) { // Added showCubeRepresentation
+                        const checkbox = getElement(key === 'showGrid' ? 'showGridInput' : (key === 'snapYToGrid' ? 'snapYToGridInput' : 'showCubeRepresentationInput'));
+                        if (checkbox) checkbox.checked = configObject[key];
+                    } else if (['gridColorCenter', 'gridColorLines'].includes(key)) {
+                        updateInputAndSpan(key, configObject[key], true); // Handle color inputs
+                    } else {
+                        updateInputAndSpan(key, configObject[key]);
+                    }
+                }
+            }
+            // Apply tool-specific settings
+            if (toolSettingsObject) {
+                updateInputAndSpan('brushSize', toolSettingsObject.brushSize ?? brushSize);
+                updateInputAndSpan('sculptStrength', toolSettingsObject.sculptStrength ?? sculptStrength);
+                updateInputAndSpan('objectPlacementScale', toolSettingsObject.objectPlacementScale ?? objectPlacementScale); // Update new object scale
+            } else {
+                // If no tool settings provided, use current global defaults
+                updateInputAndSpan('brushSize', brushSize);
+                updateInputAndSpan('sculptStrength', sculptStrength);
+                updateInputAndSpan('objectPlacementScale', objectPlacementScale); // Update new object scale
+            }
+        }
+
+        /**
+         * Updates the UI controls to reflect the settings of the currently active terrain.
+         */
+        function updateUIForActiveTerrain() {
+            const activeTerrain = getActiveTerrain();
+            // Use active terrain's config, or default config if no active terrain
+            const currentConfig = activeTerrain ? activeTerrain.config : defaultConfig;
+            // Use active terrain's tool settings, or global tool settings if no active terrain
+            const currentToolSettings = activeTerrain ? (activeTerrain.toolSettings || { brushSize, sculptStrength, currentToolMode, currentPaintType, objectPlacementScale }) : { brushSize, sculptStrength, currentToolMode, currentPaintType, objectPlacementScale };
+            
+            applyConfigToUI(currentConfig, currentToolSettings);
+
+            // Update active state of tool buttons
+            document.querySelectorAll('.tool-button').forEach(button => button.classList.remove('active'));
+            let activeToolButton;
+            const modeToSet = activeTerrain ? (currentToolSettings.currentToolMode || TOOL_MODES.NONE) : currentToolMode;
+            const paintTypeToSet = activeTerrain ? (currentToolSettings.currentPaintType || TERRAIN_TYPES.GRASS) : currentPaintType;
+            const placeObjectTypeToSet = activeTerrain ? (currentToolSettings.currentPlaceObjectType || PLACED_OBJECT_TYPES.TREE) : currentPlaceObjectType;
+
+            if (modeToSet === TOOL_MODES.PAINT) {
+                const terrainTypeKey = Object.keys(TERRAIN_TYPES).find(key => TERRAIN_TYPES[key] === paintTypeToSet);
+                activeToolButton = document.querySelector(`.tool-button[data-tool="PAINT"][data-type="${terrainTypeKey}"]`);
+            } else if (modeToSet === TOOL_MODES.PLACE_OBJECT) {
+                const objectTypeKey = Object.keys(PLACED_OBJECT_TYPES).find(key => PLACED_OBJECT_TYPES[key] === placeObjectTypeToSet);
+                activeToolButton = document.querySelector(`.tool-button[data-tool="PLACE_OBJECT"][data-object-type="${objectTypeKey}"]`);
+            }
+            else if (modeToSet !== TOOL_MODES.NONE) {
+                activeToolButton = document.querySelector(`.tool-button[data-tool="${modeToSet}"]`);
+            } else {
+                activeToolButton = getElement('navigateToolButton');
+            }
+
+            if (activeToolButton) {
+                activeToolButton.classList.add('active');
+            } else if (getElement('navigateToolButton')) {
+                // Fallback to navigate button if no specific tool button is found
+                getElement('navigateToolButton').classList.add('active');
+            }
+
+            // Update global tool variables to match active terrain's settings
+            if (activeTerrain && currentToolSettings) {
+                currentToolMode = currentToolSettings.currentToolMode || TOOL_MODES.NONE;
+                currentPaintType = currentToolSettings.currentPaintType || TERRAIN_TYPES.GRASS;
+                currentPlaceObjectType = currentToolSettings.currentPlaceObjectType || PLACED_OBJECT_TYPES.TREE; // Update new global
+                brushSize = currentToolSettings.brushSize || 10;
+                sculptStrength = currentToolSettings.sculptStrength || 0.5;
+                objectPlacementScale = currentToolSettings.objectPlacementScale || 1.0; // Update new global
+            }
+
+            // Update cursor and OrbitControls based on the new tool mode
+            if (renderer && renderer.domElement) {
+                renderer.domElement.style.cursor = (currentToolMode !== TOOL_MODES.NONE) ? 
+                    (currentToolMode === TOOL_MODES.MOVE_TERRAIN ? 'move' : 'crosshair') : 
+                    'default';
+            }
+            if (controls && THREE) {
+                controls.mouseButtons.LEFT = (currentToolMode === TOOL_MODES.NONE) ? THREE.MOUSE.ROTATE : -1;
+            }
+        }
+
+        // --- Undo/Redo System Functions ---
+
+        /**
+         * Captures the current state of the active terrain and adds it to the undo history.
+         * Clears the redo stack when a new state is saved.
+         */
+        function saveStateToHistory() {
+            const activeTerrain = getActiveTerrain();
+            if (!activeTerrain) {
+                console.warn("WARN: No active terrain to save state for.");
+                return;
+            }
+
+            // Create a deep copy of the relevant parts of the active terrain's state
+            const stateSnapshot = {
+                id: activeTerrain.id, // Store ID to match with the correct terrain instance
+                config: deepCopy(activeTerrain.config),
+                geometryData: deepCopy(activeTerrain.geometryData),
+                placedObjectsData: deepCopy(activeTerrain.placedObjectsData),
+                offset: deepCopy(activeTerrain.offset),
+                toolSettings: deepCopy(activeTerrain.toolSettings),
+                cameraState: { // Capture camera state for full scene recall
+                    position: camera.position.toArray(),
+                    target: controls.target.toArray()
+                }
+            };
+
+            undoStack.push(stateSnapshot);
+            // Limit history size
+            if (undoStack.length > MAX_HISTORY_STATES) {
+                undoStack.shift(); // Remove the oldest state
+            }
+            redoStack = []; // Clear redo stack on new action
+            updateUndoRedoButtons();
+            console.log(`LOG: State saved. Undo stack size: ${undoStack.length}`);
+        }
+
+        /**
+         * Applies a saved terrain state to the active terrain instance.
+         * @param {object} state - The state object to apply.
+         */
+        function applyTerrainState(state) {
+            const activeTerrain = getActiveTerrain();
+            if (!activeTerrain || activeTerrain.id !== state.id) {
+                // This scenario happens if the active terrain changes while undo/redo is performed.
+                // For simplicity, we'll just try to find the terrain by ID and set it active.
+                // A more robust system might handle multi-terrain undo/redo more explicitly.
+                const targetIndex = worldTerrains.findIndex(t => t.id === state.id);
+                if (targetIndex !== -1) {
+                    setActiveTerrain(targetIndex);
+                    // Re-get activeTerrain after setting it
+                    const newActiveTerrain = getActiveTerrain();
+                    if (newActiveTerrain) {
+                        Object.assign(newActiveTerrain.config, state.config);
+                        Object.assign(newActiveTerrain.offset, state.offset);
+                        Object.assign(newActiveTerrain.toolSettings, state.toolSettings);
+
+                        createOrUpdateTerrainInstance(newActiveTerrain, state.geometryData.topSurfacePositions, state.geometryData.terrainTypes);
+                        loadAndPlaceSavedObjects(newActiveTerrain, state.placedObjectsData);
+
+                        // Apply camera state
+                        if (state.cameraState && camera && controls) {
+                            camera.position.fromArray(state.cameraState.position);
+                            controls.target.fromArray(state.cameraState.target);
+                            controls.update();
+                        }
+                        updateUIForActiveTerrain();
+                        renderWorldTerrainList();
+                        console.log(`LOG: State applied for terrain ${state.id}.`);
+                        return;
+                    }
+                }
+                displayGlobalError(`Cannot apply state: Active terrain mismatch or not found for ID ${state.id}.`, "undo-redo-mismatch");
+                return;
+            }
+
+            // Apply configuration, offset, and tool settings
+            Object.assign(activeTerrain.config, state.config);
+            Object.assign(activeTerrain.offset, state.offset);
+            Object.assign(activeTerrain.toolSettings, state.toolSettings);
+
+            // Recreate terrain mesh with saved geometry data
+            createOrUpdateTerrainInstance(activeTerrain, state.geometryData.topSurfacePositions, state.geometryData.terrainTypes);
+            // Re-place objects from saved data
+            loadAndPlaceSavedObjects(activeTerrain, state.placedObjectsData);
+
+            // Apply camera state
+            if (state.cameraState && camera && controls) {
+                camera.position.fromArray(state.cameraState.position);
+                controls.target.fromArray(state.cameraState.target);
+                controls.update();
+            }
+
+            // Update UI to reflect the applied state
+            updateUIForActiveTerrain();
+            renderWorldTerrainList(); // Update offsets in list
+            console.log(`LOG: State applied for terrain ${activeTerrain.id}.`);
+        }
+
+        /**
+         * Undoes the last action by reverting to the previous state in history.
+         */
+        function undo() {
+            if (undoStack.length <= 1) { // Need at least one state to revert to (the initial state)
+                console.log("LOG: Undo stack is empty or only contains initial state.");
+                return;
+            }
+            
+            // Pop the current state and push it to redo stack
+            const currentState = undoStack.pop();
+            redoStack.push(currentState);
+
+            // Apply the new top of the undo stack
+            const previousState = undoStack[undoStack.length - 1];
+            applyTerrainState(previousState);
+            updateUndoRedoButtons();
+            console.log(`LOG: Undo performed. Undo stack size: ${undoStack.length}, Redo stack size: ${redoStack.length}`);
+        }
+
+        /**
+         * Redoes a previously undone action.
+         */
+        function redo() {
+            if (redoStack.length === 0) {
+                console.log("LOG: Redo stack is empty.");
+                return;
+            }
+
+            // Pop from redo stack and push to undo stack
+            const undoneState = redoStack.pop();
+            undoStack.push(undoneState);
+
+            // Apply the re-done state
+            applyTerrainState(undoneState);
+            updateUndoRedoButtons();
+            console.log(`LOG: Redo performed. Undo stack size: ${undoStack.length}, Redo stack size: ${redoStack.length}`);
+        }
+
+        /**
+         * Updates the disabled state of the Undo/Redo buttons based on stack contents.
+         */
+        function updateUndoRedoButtons() {
+            const undoButton = getElement('undoButton');
+            const redoButton = getElement('redoButton');
+            if (undoButton) {
+                undoButton.disabled = undoStack.length <= 1; // Disable if only initial state or empty
+            }
+            if (redoButton) {
+                redoButton.disabled = redoStack.length === 0;
+            }
+        }
+
+        // --- Terrain Instance Creation and Manipulation ---
+        /**
+         * Creates a new terrain instance object with default properties.
+         * This object holds configuration, geometry data, placed objects, and Three.js meshes.
+         * @param {string} id - Unique ID for the terrain instance.
+         * @param {object} initialConfig - Initial configuration for terrain generation.
+         * @param {object} initialOffset - Initial X, Y, Z offset for the terrain.
+         * @returns {object} The new terrain instance object.
+         */
+        function createNewTerrainInstance(id, initialConfig, initialOffset) {
+            console.log("LOG: createNewTerrainInstance - ID:", id, "Initial Offset:", initialOffset);
+            const newInstance = {
+                id: id,
+                config: deepCopy(initialConfig),
+                geometryData: null, // Stores vertex positions and terrain types for saving
+                placedObjectsData: [], // Stores data for placed decorative objects
+                offset: deepCopy(initialOffset), // World offset of this terrain instance
+                mesh: null, // THREE.Mesh for the terrain surface and sides
+                waterMesh: null, // THREE.Mesh for the water plane
+                cubeInstancesMesh: null, // New: InstancedMesh for cube representation
+                objectsGroup: new THREE.Group(), // Group to hold placed objects (trees, rocks)
+                vertexTerrainTypes: [], // Array storing terrain type for each vertex
+                // Tool settings specific to this terrain instance
+                toolSettings: {
+                    brushSize: 10,
+                    sculptStrength: 0.5,
+                    currentToolMode: TOOL_MODES.NONE,
+                    currentPaintType: TERRAIN_TYPES.GRASS,
+                    currentPlaceObjectType: PLACED_OBJECT_TYPES.TREE, // New default for tool settings
+                    objectPlacementScale: 1.0 // New default for tool settings
+                }
+            };
+
+            // Set the initial position of the objects group
+            if (newInstance.offset && typeof newInstance.offset.x === 'number') { 
+                newInstance.objectsGroup.position.set(newInstance.offset.x, newInstance.offset.y, newInstance.offset.z); 
+            } else { 
+                console.error("LOG: createNewTerrainInstance - Offset invalid. Defaulting to {0,0,0}.", initialOffset, newInstance.offset); 
+                newInstance.offset = {x:0,y:0,z:0}; 
+                newInstance.objectsGroup.position.set(0,0,0); 
+            }
+            worldGroup.add(newInstance.objectsGroup); // Add the objects group to the main world group
+            return newInstance;
+        }
+
+        /**
+         * Generates Simplex noise value for a given (x, y) coordinate.
+         * @param {number} x - X coordinate.
+         * @param {number} y - Y coordinate.
+         * @param {number} scale - Overall scale of the noise.
+         * @param {number} octaves - Number of noise layers.
+         * @param {number} persistence - How much each octave contributes to the overall shape.
+         * @param {number} lacunarity - How much the frequency increases with each octave.
+         * @returns {number} The noise value.
+         */
+        function getNoise(x, y, scale, octaves, persistence, lacunarity) {
+            let total = 0;
+            let frequency = 1;
+            let amplitude = 1;
+            let maxValue = 0; // Used for normalizing result to -1 to 1
+
+            for (let i = 0; i < octaves; i++) {
+                if (simplex && typeof simplex.noise2D === 'function') {
+                    total += simplex.noise2D(x * frequency / scale, y * frequency / scale) * amplitude;
+                } else {
+                    return 0; // Return 0 if simplex noise is not available
+                }
+                maxValue += amplitude;
+                amplitude *= persistence;
+                frequency *= lacunarity;
+            }
+            return maxValue === 0 ? 0 : total / maxValue; // Normalize
+        }
+
+        /**
+         * Creates or updates the 3D mesh for a given terrain instance.
+         * Applies noise, plateau, and valley modifications to vertex heights.
+         * Also generates side and bottom faces and applies vertex colors based on terrain types.
+         * Can now also generate a cube (voxel) representation.
+         * @param {object} terrainInstance - The terrain instance object to update.
+         * @param {number[]|null} loadedTopSurfacePositions - Optional: pre-loaded vertex positions for the top surface.
+         * @param {number[]|null} loadedTerrainTypes - Optional: pre-loaded terrain types for vertices.
+         */
+        function createOrUpdateTerrainInstance(terrainInstance, loadedTopSurfacePositions = null, loadedTerrainTypes = null) {
+            if (!scene || !THREE || !terrainInstance) return;
+
+            // Dispose of existing meshes to prevent memory leaks
+            if (terrainInstance.mesh) {
+                worldGroup.remove(terrainInstance.mesh);
+                disposeThreeObject(terrainInstance.mesh);
+                terrainInstance.mesh = null;
+            }
+            if (terrainInstance.waterMesh) {
+                worldGroup.remove(terrainInstance.waterMesh);
+                disposeThreeObject(terrainInstance.waterMesh);
+                terrainInstance.waterMesh = null;
+            }
+            // New: Dispose of existing cube representation
+            if (terrainInstance.cubeInstancesMesh) {
+                worldGroup.remove(terrainInstance.cubeInstancesMesh);
+                disposeThreeObject(terrainInstance.cubeInstancesMesh);
+                terrainInstance.cubeInstancesMesh = null;
+            }
+
+            const config = terrainInstance.config;
+            const widthSegments = config.segments;
+            const heightSegments = config.segments;
+            const numVertices = (widthSegments + 1) * (heightSegments + 1);
+
+            // Always calculate positions and terrain types, regardless of rendering mode
+            const positionsArray = new Float32Array(numVertices * 3); // Only top surface positions for calculation
+            const terrainTypesArray = loadedTerrainTypes ? 
+                new Uint8Array(loadedTerrainTypes) : 
+                (terrainInstance.vertexTerrainTypes && terrainInstance.vertexTerrainTypes.length === numVertices ? 
+                    terrainInstance.vertexTerrainTypes : 
+                    new Uint8Array(numVertices));
+            
+            const tempColor = new THREE.Color();
+            const segmentWidth = config.terrainWidth / widthSegments;
+            const segmentHeight = config.terrainDepth / heightSegments;
+
+            // Generate vertices for the top surface (used for both mesh and cube representation)
+            for (let j = 0; j <= heightSegments; j++) {
+                for (let i = 0; i <= widthSegments; i++) {
+                    const vertexIndex = j * (widthSegments + 1) + i;
+                    let x, y_top, z;
+
+                    if (loadedTopSurfacePositions && loadedTopSurfacePositions.length >= (vertexIndex + 1) * 3) {
+                        x = loadedTopSurfacePositions[vertexIndex * 3];
+                        y_top = loadedTopSurfacePositions[vertexIndex * 3 + 1];
+                        z = loadedTopSurfacePositions[vertexIndex * 3 + 2];
+                    } else {
+                        x = i * segmentWidth - config.terrainWidth / 2;
+                        z = j * segmentHeight - config.terrainDepth / 2;
+
+                        let noiseValue = getNoise(x, z, config.noiseScale, config.octaves, config.persistence, config.lacunarity);
+                        
+                        if (noiseValue < config.valleyThreshold && Math.abs(config.valleyThreshold) > 1e-5) {
+                            noiseValue *= 1 + (config.valleyThreshold - noiseValue) * (config.valleyDepthFactor - 1) / Math.abs(config.valleyThreshold);
+                        }
+                        y_top = noiseValue * config.terrainHeightScale;
+
+                        if (config.plateauLevel > 0) {
+                            const heightScale = config.terrainHeightScale === 0 ? 1 : config.terrainHeightScale;
+                            const normalizedHeight = (y_top / heightScale + 1) / 2;
+                            if (normalizedHeight > config.plateauLevel) {
+                                y_top = THREE.MathUtils.lerp(
+                                    y_top, 
+                                    config.plateauLevel * heightScale * 2 - heightScale, 
+                                    1 - THREE.MathUtils.smoothstep(normalizedHeight - config.plateauLevel, 0, config.plateauSmoothing)
+                                );
+                            }
+                        }
+                    }
+                    positionsArray[vertexIndex * 3] = x;
+                    positionsArray[vertexIndex * 3 + 1] = y_top;
+                    positionsArray[vertexIndex * 3 + 2] = z;
+
+                    let terrainTypeId;
+                    if (loadedTerrainTypes && loadedTerrainTypes.length > vertexIndex) {
+                        terrainTypeId = terrainTypesArray[vertexIndex];
+                    } else {
+                        if (y_top < config.waterLevel + 2) { 
+                            terrainTypeId = TERRAIN_TYPES.SAND;
+                        } else if (y_top < config.waterLevel + 15) { 
+                            terrainTypeId = TERRAIN_TYPES.GRASS;
+                        } else if (y_top < config.terrainHeightScale * 0.6) { 
+                            terrainTypeId = TERRAIN_TYPES.ROCK;
+                        } else { 
+                            terrainTypeId = TERRAIN_TYPES.SNOW;
+                        }
+                        terrainTypesArray[vertexIndex] = terrainTypeId;
+                    }
+                }
+            }
+            terrainInstance.vertexTerrainTypes = terrainTypesArray; // Update terrain instance's types array
+            terrainInstance.geometryData = { // Store for saving
+                topSurfacePositions: Array.from(positionsArray),
+                terrainTypes: Array.from(terrainTypesArray)
+            };
+
+
+            if (defaultConfig.showCubeRepresentation) {
+                // --- Generate Cubes (InstancedMesh) ---
+                const numCubes = widthSegments * heightSegments; // One cube per segment cell
+                const cubeWidth = config.terrainWidth / widthSegments;
+                const cubeDepth = config.terrainDepth / heightSegments;
+                // cubeHeight will be dynamic based on terrain height
+
+                const boxGeometry = new THREE.BoxGeometry(cubeWidth, 1, cubeDepth); // Height 1, will scale later
+                const cubeMaterial = new THREE.MeshStandardMaterial({
+                    vertexColors: false, // InstancedMesh uses instanceColor, not vertexColors
+                    roughness: 0.8,
+                    metalness: 0.2
+                }); 
+                
+                terrainInstance.cubeInstancesMesh = new THREE.InstancedMesh(boxGeometry, cubeMaterial, numCubes);
+                terrainInstance.cubeInstancesMesh.castShadow = true;
+                terrainInstance.cubeInstancesMesh.receiveShadow = true;
+                terrainInstance.cubeInstancesMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); // Will be updated frequently
+                terrainInstance.cubeInstancesMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(numCubes * 3), 3); // For per-instance color
+
+                const matrix = new THREE.Matrix4();
+                const dummy = new THREE.Object3D(); // Helper object for setting matrix
+
+                for (let j = 0; j < heightSegments; j++) {
+                    for (let i = 0; i < widthSegments; i++) {
+                        const cubeIndex = j * widthSegments + i;
+
+                        // Get the average height of the 4 corners of this segment's top surface
+                        const v00_idx = j * (widthSegments + 1) + i;
+                        const v10_idx = j * (widthSegments + 1) + (i + 1);
+                        const v01_idx = (j + 1) * (widthSegments + 1) + i;
+                        const v11_idx = (j + 1) * (widthSegments + 1) + (i + 1);
+
+                        const y00 = positionsArray[v00_idx * 3 + 1];
+                        const y10 = positionsArray[v10_idx * 3 + 1];
+                        const y01 = positionsArray[v01_idx * 3 + 1];
+                        const y11 = positionsArray[v11_idx * 3 + 1];
+                        const averageY = (y00 + y10 + y01 + y11) / 4;
+
+                        // Calculate the center position of the cube
+                        const x_center = i * cubeWidth - config.terrainWidth / 2 + cubeWidth / 2;
+                        const z_center = j * cubeDepth - config.terrainDepth / 2 + cubeDepth / 2;
+                        
+                        // Determine the height of the cube based on averageY
+                        // If averageY is positive, cube goes from 0 to averageY
+                        // If averageY is negative, cube goes from averageY to 0
+                        const actualCubeHeight = Math.abs(averageY);
+                        const cubeYPosition = averageY / 2; // Center of the cube
+
+                        // Only render a cube if its height is significant
+                        if (actualCubeHeight > 0.1) { // Avoid rendering tiny cubes
+                            dummy.position.set(x_center, cubeYPosition, z_center);
+                            dummy.scale.set(1, actualCubeHeight, 1); // Apply height scale to unit height geometry
+                            dummy.updateMatrix();
+                            terrainInstance.cubeInstancesMesh.setMatrixAt(cubeIndex, dummy.matrix);
+
+                            // Determine color from one of the corners (e.g., top-left corner's terrain type)
+                            const terrainTypeId = terrainTypesArray[v00_idx];
+                            tempColor.set(TERRAIN_COLORS[terrainTypeId] || TERRAIN_COLORS[TERRAIN_TYPES.GRASS]);
+                            terrainInstance.cubeInstancesMesh.setColorAt(cubeIndex, tempColor);
+                        } else {
+                            // If height is negligible, set matrix to identity to effectively hide the instance
+                            dummy.scale.set(0, 0, 0); // Scale to zero to hide
+                            dummy.updateMatrix();
+                            terrainInstance.cubeInstancesMesh.setMatrixAt(cubeIndex, dummy.matrix);
+                            terrainInstance.cubeInstancesMesh.setColorAt(cubeIndex, new THREE.Color(0,0,0)); // Set color to black
+                        }
+                    }
+                }
+                terrainInstance.cubeInstancesMesh.instanceMatrix.needsUpdate = true;
+                terrainInstance.cubeInstancesMesh.instanceColor.needsUpdate = true;
+                terrainInstance.cubeInstancesMesh.position.set(terrainInstance.offset.x, terrainInstance.offset.y, terrainInstance.offset.z);
+                worldGroup.add(terrainInstance.cubeInstancesMesh);
+
+                // Water plane for cube representation (same as mesh)
+                const waterGeometry = new THREE.PlaneGeometry(config.terrainWidth * 1.5, config.terrainDepth * 1.5, 1, 1);
+                waterGeometry.rotateX(-Math.PI / 2);
+                const waterMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x336699,
+                    transparent: true,
+                    opacity: 0.7,
+                    roughness: 0.1,
+                    metalness: 0.3
+                });
+                terrainInstance.waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
+                terrainInstance.waterMesh.position.set(terrainInstance.offset.x, config.waterLevel + terrainInstance.offset.y, terrainInstance.offset.z);
+                worldGroup.add(terrainInstance.waterMesh);
+
+            } else {
+                // --- Generate Continuous Mesh ---
+                const fullPositions = new Float32Array(numVertices * 2 * 3); // Top surface + bottom surface
+                const fullColors = new Float32Array(numVertices * 2 * 3); // Colors for top and bottom
+                const indices = []; // Indices for faces
+
+                // Populate fullPositions and fullColors from pre-calculated positionsArray and terrainTypesArray
+                for (let j = 0; j <= heightSegments; j++) {
+                    for (let i = 0; i <= widthSegments; i++) {
+                        const vertexIndex = j * (widthSegments + 1) + i;
+                        
+                        // Top surface positions
+                        fullPositions[vertexIndex * 3] = positionsArray[vertexIndex * 3];
+                        fullPositions[vertexIndex * 3 + 1] = positionsArray[vertexIndex * 3 + 1];
+                        fullPositions[vertexIndex * 3 + 2] = positionsArray[vertexIndex * 3 + 2];
+
+                        // Bottom surface positions
+                        const bottomVertexIndex = vertexIndex + numVertices;
+                        fullPositions[bottomVertexIndex * 3] = positionsArray[vertexIndex * 3];
+                        fullPositions[bottomVertexIndex * 3 + 1] = positionsArray[vertexIndex * 3 + 1] - config.terrainThickness;
+                        fullPositions[bottomVertexIndex * 3 + 2] = positionsArray[vertexIndex * 3 + 2];
+
+                        // Top surface color
+                        const terrainTypeId = terrainTypesArray[vertexIndex];
+                        tempColor.set(TERRAIN_COLORS[terrainTypeId] || TERRAIN_COLORS[TERRAIN_TYPES.GRASS]);
+                        fullColors[vertexIndex * 3] = tempColor.r;
+                        fullColors[vertexIndex * 3 + 1] = tempColor.g;
+                        fullColors[vertexIndex * 3 + 2] = tempColor.b;
+
+                        // Bottom surface color
+                        tempColor.set(SIDE_BOTTOM_COLOR);
+                        fullColors[bottomVertexIndex * 3] = tempColor.r;
+                        fullColors[bottomVertexIndex * 3 + 1] = tempColor.g;
+                        fullColors[bottomVertexIndex * 3 + 2] = tempColor.b;
+                    }
+                }
+
+                // Generate indices for the top and bottom surfaces (quads as two triangles)
+                for (let j = 0; j < heightSegments; j++) {
+                    for (let i = 0; i < widthSegments; i++) {
+                        const a = i + (widthSegments + 1) * j;
+                        const b = i + (widthSegments + 1) * (j + 1);
+                        const c = (i + 1) + (widthSegments + 1) * (j + 1);
+                        const d = (i + 1) + (widthSegments + 1) * j;
+
+                        // Top surface
+                        indices.push(a, b, d);
+                        indices.push(b, c, d);
+
+                        // Bottom surface (reversed winding for correct normals)
+                        const offset = numVertices;
+                        indices.push(a + offset, d + offset, b + offset);
+                        indices.push(b + offset, d + offset, c + offset);
+                    }
+                }
+
+                // Generate indices for the sides of the terrain
+                // Front side (along Z-axis, j=0)
+                for (let i = 0; i < widthSegments; i++) {
+                    let v1 = i; // Top front left
+                    let v2 = i + 1; // Top front right
+                    let v3 = v1 + numVertices; // Bottom front left
+                    let v4 = v2 + numVertices; // Bottom front right
+                    indices.push(v1, v2, v3);
+                    indices.push(v2, v4, v3);
+                }
+                // Back side (along Z-axis, j=heightSegments)
+                for (let i = 0; i < widthSegments; i++) {
+                    let v1 = i + (widthSegments + 1) * heightSegments; // Top back left
+                    let v2 = (i + 1) + (widthSegments + 1) * heightSegments; // Top back right
+                    let v3 = v1 + numVertices; // Bottom back left
+                    let v4 = v2 + numVertices; // Bottom back right
+                    indices.push(v1, v3, v2); // Reversed winding
+                    indices.push(v2, v3, v4); // Reversed winding
+                }
+                // Left side (along X-axis, i=0)
+                for (let j = 0; j < heightSegments; j++) {
+                    let v1 = (widthSegments + 1) * j; // Top left front
+                    let v2 = (widthSegments + 1) * (j + 1); // Top left back
+                    let v3 = v1 + numVertices; // Bottom left front
+                    let v4 = v2 + numVertices; // Bottom left back
+                    indices.push(v1, v3, v2); // Reversed winding
+                    indices.push(v2, v3, v4); // Reversed winding
+                }
+                // Right side (along X-axis, i=widthSegments)
+                for (let j = 0; j < heightSegments; j++) {
+                    let v1 = widthSegments + (widthSegments + 1) * j; // Top right front
+                    let v2 = widthSegments + (widthSegments + 1) * (j + 1); // Top right back
+                    let v3 = v1 + numVertices; // Bottom right front
+                    let v4 = v2 + numVertices; // Bottom right back
+                    indices.push(v1, v2, v3);
+                    indices.push(v2, v4, v3);
+                }
+
+                // Create BufferGeometry and set attributes
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(fullPositions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(fullColors, 3));
+                geometry.setIndex(indices);
+                geometry.computeVertexNormals(); // Calculate normals for proper lighting
+
+                // Create material and mesh
+                const material = new THREE.MeshStandardMaterial({
+                    vertexColors: true, // Use colors from vertex attribute
+                    roughness: 0.8,
+                    metalness: 0.2,
+                    side: THREE.DoubleSide // Render both front and back faces
+                });
+                terrainInstance.mesh = new THREE.Mesh(geometry, material);
+                terrainInstance.mesh.castShadow = true;
+                terrainInstance.mesh.receiveShadow = true;
+                // Set mesh position based on terrain instance offset
+                terrainInstance.mesh.position.set(terrainInstance.offset.x, terrainInstance.offset.y, terrainInstance.offset.z);
+                worldGroup.add(terrainInstance.mesh); // Add to the main world group
+
+                // Create and add water plane
+                const waterGeometry = new THREE.PlaneGeometry(config.terrainWidth * 1.5, config.terrainDepth * 1.5, 1, 1);
+                waterGeometry.rotateX(-Math.PI / 2); // Rotate to be horizontal
+                const waterMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x336699, // Blue water color
+                    transparent: true,
+                    opacity: 0.7,
+                    roughness: 0.1,
+                    metalness: 0.3
+                });
+                terrainInstance.waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
+                // Position water plane at the specified water level relative to terrain offset
+                terrainInstance.waterMesh.position.set(terrainInstance.offset.x, config.waterLevel + terrainInstance.offset.y, terrainInstance.offset.z);
+                worldGroup.add(terrainInstance.waterMesh);
+            }
+        }
+
+        /**
+         * Handles mouse down events on the terrain.
+         * Initiates sculpting, painting, or terrain movement.
+         * @param {MouseEvent} event - The mouse event.
+         */
+        function onTerrainMouseDown(event) {
+            // Only respond to left mouse button (button 0)
+            if (event.button === 0 && activeTerrainIndex !== -1) {
+                // For tools that apply on click and potentially drag (sculpt, paint, move)
+                if (currentToolMode === TOOL_MODES.MOVE_TERRAIN || 
+                    currentToolMode === TOOL_MODES.SCULPT_RAISE ||
+                    currentToolMode === TOOL_MODES.SCULPT_LOWER ||
+                    currentToolMode === TOOL_MODES.SCULPT_SMOOTH || // New tool
+                    currentToolMode === TOOL_MODES.SCULPT_FLATTEN || // New tool
+                    currentToolMode === TOOL_MODES.PAINT) {
+                    isInteracting = true; 
+                    handleTerrainInteraction(event); // Apply tool immediately on click
+                } else if (currentToolMode === TOOL_MODES.PLACE_OBJECT) {
+                    // For object placement, it's a single click action
+                    handleTerrainInteraction(event);
+                    saveStateToHistory(); // Save state immediately after placing object
+                }
+            }
+        }
+
+        /**
+         * Handles mouse move events on the terrain.
+         * Continues sculpting, painting, or terrain movement while mouse is down.
+         * @param {MouseEvent} event - The mouse event.
+         */
+        function onTerrainMouseMove(event) {
+            if (isInteracting && activeTerrainIndex !== -1) {
+                // Only continue interaction for tools that support dragging
+                if (currentToolMode === TOOL_MODES.MOVE_TERRAIN) {
+                    handleMoveTerrain(event);
+                } else if (currentToolMode === TOOL_MODES.SCULPT_RAISE ||
+                           currentToolMode === TOOL_MODES.SCULPT_LOWER ||
+                           currentToolMode === TOOL_MODES.SCULPT_SMOOTH || // New tool
+                           currentToolMode === TOOL_MODES.SCULPT_FLATTEN || // New tool
+                           currentToolMode === TOOL_MODES.PAINT) {
+                    handleTerrainInteraction(event); 
+                }
+            }
+        }
+
+        /**
+         * Handles mouse up events on the terrain.
+         * Ends sculpting, painting, or terrain movement.
+         * @param {MouseEvent} event - The mouse event.
+         */
+        function onTerrainMouseUp(event) {
+            // Only respond to left mouse button (button 0)
+            if (event.button === 0) {
+                if (isInteracting) { 
+                    isInteracting = false; // End interaction
+                    const activeTerrain = getActiveTerrain();
+                    // Update vertex normals after sculpting to ensure correct lighting
+                    if (activeTerrain && activeTerrain.mesh && activeTerrain.mesh.geometry && activeTerrain.mesh.geometry.attributes.position.needsUpdate) {
+                        activeTerrain.mesh.geometry.computeVertexNormals();
+                        activeTerrain.mesh.geometry.attributes.position.needsUpdate = false; // Reset flag
+                    }
+                    if (currentToolMode === TOOL_MODES.MOVE_TERRAIN) {
+                        renderWorldTerrainList(); // Re-render list to update offset display after moving
+                    }
+                    // Save state after a continuous interaction (sculpting, painting, moving)
+                    // Object placement is saved on mouse down.
+                    if (currentToolMode !== TOOL_MODES.PLACE_OBJECT) {
+                        saveStateToHistory(); 
+                    }
+                }
+            }
+        }
+
+        /**
+         * Handles double-click events on the terrain to focus the camera.
+         * @param {MouseEvent} event - The mouse event.
+         */
+        function onTerrainDoubleClick(event) {
+            const activeTerrain = getActiveTerrain();
+            if (!activeTerrain || (!activeTerrain.mesh && !activeTerrain.cubeInstancesMesh) || !camera || !controls) return; // Ensure one of the representations exists
+
+            // Prevent focus transition if currently interacting with a tool
+            if (currentToolMode !== TOOL_MODES.NONE && isInteracting) return;
+
+            // Calculate mouse position in normalized device coordinates (-1 to +1)
+            mouse.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            raycaster.setFromCamera(mouse, camera); // Set raycaster from camera and mouse
+
+            // Find intersections with the active terrain mesh OR cube representation
+            const intersections = raycaster.intersectObject(activeTerrain.mesh || activeTerrain.cubeInstancesMesh); 
+
+            if (intersections.length > 0) {
+                // Get the intersection point in world coordinates
+                newTargetPosition = intersections[0].point.clone();
+                isFocusTransitioning = true; // Start camera transition
+            }
+        }
+
+        /**
+         * Handles moving the active terrain instance.
+         * @param {MouseEvent} event - The mouse event.
+         */
+        function handleMoveTerrain(event) {
+            const activeTerrain = getActiveTerrain();
+            if (!activeTerrain || !camera || !groundPlane) return;
+
+            // Calculate mouse position in normalized device coordinates
+            mouse.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersectionPoint = new THREE.Vector3();
+            // Intersect the ray with the invisible ground plane to get world coordinates
+            raycaster.ray.intersectPlane(groundPlane, intersectionPoint);
+
+            if (intersectionPoint) {
+                // Snap to grid for X and Z coordinates
+                activeTerrain.offset.x = Math.round(intersectionPoint.x / defaultConfig.gridCellSize) * defaultConfig.gridCellSize;
+                activeTerrain.offset.z = Math.round(intersectionPoint.z / defaultConfig.gridCellSize) * defaultConfig.gridCellSize;
+                
+                // Optionally snap Y offset to grid
+                if (defaultConfig.snapYToGrid) {
+                    activeTerrain.offset.y = Math.round(activeTerrain.offset.y / defaultConfig.gridCellSize) * defaultConfig.gridCellSize;
+                }
+
+                // Update the position of the terrain mesh, water mesh, and objects group
+                if (activeTerrain.mesh) activeTerrain.mesh.position.set(activeTerrain.offset.x, activeTerrain.offset.y, activeTerrain.offset.z);
+                if (activeTerrain.waterMesh) activeTerrain.waterMesh.position.set(activeTerrain.offset.x, activeTerrain.offset.y + activeTerrain.config.waterLevel, activeTerrain.offset.z);
+                if (activeTerrain.objectsGroup) activeTerrain.objectsGroup.position.set(activeTerrain.offset.x, activeTerrain.offset.y, activeTerrain.offset.z);
+                // New: Update cube representation position
+                if (activeTerrain.cubeInstancesMesh) activeTerrain.cubeInstancesMesh.position.set(activeTerrain.offset.x, activeTerrain.offset.y, activeTerrain.offset.z);
+
+                // No need to call renderWorldTerrainList here, it's called on mouseup for performance
+            }
+        }
+
+        /**
+         * Handles sculpting (raise/lower/smooth/flatten) or painting terrain based on the current tool mode.
+         * Also handles placing objects for the new PLACE_OBJECT tool.
+         * @param {MouseEvent} event - The mouse event.
+         */
+        function handleTerrainInteraction(event) {
+            const activeTerrain = getActiveTerrain();
+            // Ensure an active terrain, its mesh, camera, and a valid tool mode are present
+            if (!activeTerrain || (!activeTerrain.mesh && !activeTerrain.cubeInstancesMesh) || !camera || currentToolMode === TOOL_MODES.NONE || !activeTerrain.geometryData) {
+                return;
+            }
+
+            // Calculate mouse position in normalized device coordinates
+            mouse.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            raycaster.setFromCamera(mouse, camera);
+
+            // Intersect with the currently active terrain representation
+            const intersections = raycaster.intersectObject(activeTerrain.mesh || activeTerrain.cubeInstancesMesh);
+
+            if (intersections.length > 0) {
+                const intersectionPoint = intersections[0].point; // World coordinates of intersection
+                // Convert world intersection point to local coordinates relative to the terrain's origin
+                const localIntersectionPoint = new THREE.Vector3().subVectors(intersectionPoint, activeTerrain.mesh ? activeTerrain.mesh.position : activeTerrain.cubeInstancesMesh.position);
+                
+                // We operate directly on the geometryData (positionsArray) for sculpting/painting
+                const positionsArray = activeTerrain.geometryData.topSurfacePositions;
+                const terrainTypesArray = activeTerrain.geometryData.terrainTypes;
+
+                let dataChanged = false; // Flag to indicate if geometryData was modified
+
+                const numTopVertices = (activeTerrain.config.segments + 1) * (activeTerrain.config.segments + 1);
+                const tempVertex = new THREE.Vector3();
+
+                if (currentToolMode === TOOL_MODES.PAINT || 
+                    currentToolMode === TOOL_MODES.SCULPT_RAISE || 
+                    currentToolMode === TOOL_MODES.SCULPT_LOWER ||
+                    currentToolMode === TOOL_MODES.SCULPT_SMOOTH || 
+                    currentToolMode === TOOL_MODES.SCULPT_FLATTEN) {
+
+                    // Store initial heights for smoothing/flattening to avoid artifacts from sequential updates within one drag
+                    const initialHeights = new Float32Array(numTopVertices);
+                    for (let i = 0; i < numTopVertices; i++) {
+                        initialHeights[i] = positionsArray[i * 3 + 1]; // Get Y component
+                    }
+
+                    let flattenTargetHeight = 0;
+                    if (currentToolMode === TOOL_MODES.SCULPT_FLATTEN) {
+                        flattenTargetHeight = localIntersectionPoint.y;
+                    }
+
+                    // Iterate through all top surface vertices for sculpting/painting
+                    for (let i = 0; i < numTopVertices; i++) {
+                        tempVertex.set(positionsArray[i * 3], positionsArray[i * 3 + 1], positionsArray[i * 3 + 2]);
+
+                        // Check if the vertex is within the brush radius
+                        if (tempVertex.distanceTo(localIntersectionPoint) < brushSize) {
+                            if (currentToolMode === TOOL_MODES.PAINT) {
+                                const paintType = currentPaintType;
+                                if (terrainTypesArray[i] !== paintType) {
+                                    terrainTypesArray[i] = paintType;
+                                    dataChanged = true;
+                                }
+                            } else if (currentToolMode === TOOL_MODES.SCULPT_RAISE || currentToolMode === TOOL_MODES.SCULPT_LOWER) {
+                                const currentY = positionsArray[i * 3 + 1];
+                                const newY = currentToolMode === TOOL_MODES.SCULPT_RAISE ? currentY + sculptStrength : currentY - sculptStrength;
+                                positionsArray[i * 3 + 1] = newY;
+                                dataChanged = true;
+                            } else if (currentToolMode === TOOL_MODES.SCULPT_SMOOTH) {
+                                const segments = activeTerrain.config.segments;
+                                const row = Math.floor(i / (segments + 1));
+                                const col = i % (segments + 1);
+
+                                let sumHeight = 0;
+                                let count = 0;
+
+                                for (let r = Math.max(0, row - 1); r <= Math.min(segments, row + 1); r++) {
+                                    for (let c = Math.max(0, col - 1); c <= Math.min(segments, col + 1); c++) {
+                                        const neighborIndex = r * (segments + 1) + c;
+                                        sumHeight += initialHeights[neighborIndex];
+                                        count++;
+                                    }
+                                }
+                                const averageHeight = sumHeight / count;
+                                const currentY = positionsArray[i * 3 + 1];
+                                const newY = THREE.MathUtils.lerp(currentY, averageHeight, sculptStrength);
+                                positionsArray[i * 3 + 1] = newY;
+                                dataChanged = true;
+                            } else if (currentToolMode === TOOL_MODES.SCULPT_FLATTEN) {
+                                const currentY = positionsArray[i * 3 + 1];
+                                const newY = THREE.MathUtils.lerp(currentY, flattenTargetHeight, sculptStrength);
+                                positionsArray[i * 3 + 1] = newY;
+                                dataChanged = true;
+                            }
+                        }
+                    }
+                } else if (currentToolMode === TOOL_MODES.PLACE_OBJECT) {
+                    if (!isInteracting) return; 
+                    placeSingleObject(activeTerrain, intersectionPoint, currentPlaceObjectType, objectPlacementScale);
+                    isInteracting = false; 
+                }
+
+                // If data changed, re-render the terrain representation
+                if (dataChanged) {
+                    // Recreate the terrain mesh or cubes based on the updated geometryData
+                    createOrUpdateTerrainInstance(activeTerrain, positionsArray, terrainTypesArray);
+                }
+            }
+        }
+
+        /**
+         * Creates and places a single decorative object (tree or rock) at a specific world position.
+         * @param {object} terrainInstance - The terrain instance to add the object to.
+         * @param {THREE.Vector3} worldPosition - The world coordinates where the object should be placed.
+         * @param {string} objectType - The type of object to place (e.g., PLACED_OBJECT_TYPES.TREE).
+         * @param {number} scaleFactor - A scale multiplier for the object.
+         */
+        function placeSingleObject(terrainInstance, worldPosition, objectType, scaleFactor = 1.0) {
+            if (!terrainInstance || !terrainInstance.objectsGroup) return;
+
+            let mesh;
+            let objectData = { type: objectType, position: { x: worldPosition.x, y: worldPosition.y, z: worldPosition.z }, scale: {} };
+
+            if (objectType === PLACED_OBJECT_TYPES.TREE) {
+                const baseHeight = 2 + Math.random() * 3;
+                const baseScale = 0.5 + Math.random() * 0.5;
+                const treeHeight = baseHeight * scaleFactor;
+                const treeScale = baseScale * scaleFactor;
+                const treeGeometry = new THREE.BoxGeometry(treeScale, treeHeight, treeScale);
+                const treeMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                mesh = new THREE.Mesh(treeGeometry, treeMaterial);
+                mesh.position.set(worldPosition.x, worldPosition.y + treeHeight / 2, worldPosition.z);
+                objectData.scale = { x: treeScale, y: treeHeight, z: treeScale };
+            } else if (objectType === PLACED_OBJECT_TYPES.ROCK_OBJ) {
+                const baseRadius = 0.5 + Math.random() * 1;
+                const rockRadius = baseRadius * scaleFactor;
+                const rockGeometry = new THREE.SphereGeometry(rockRadius, 8, 6);
+                const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x696969 });
+                mesh = new THREE.Mesh(rockGeometry, rockMaterial);
+                mesh.position.set(worldPosition.x, worldPosition.y + rockRadius, worldPosition.z);
+                objectData.scale = { radius: rockRadius };
+            }
+
+            if (mesh) {
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                terrainInstance.objectsGroup.add(mesh);
+                terrainInstance.placedObjectsData.push(objectData); // Add to saved data
+                console.log(`LOG: Manually placed a ${objectType} at (${worldPosition.x.toFixed(2)}, ${worldPosition.y.toFixed(2)}, ${worldPosition.z.toFixed(2)})`);
+            }
+        }
+
+        /**
+         * Places decorative objects (trees, rocks) on the terrain based on terrain type and probability.
+         * This function is primarily for *procedural* placement and will only run if no manual objects exist.
+         * @param {object} terrainInstance - The terrain instance to place objects on.
+         */
+        function placeObjects(terrainInstance = getActiveTerrain()) {
+            if (!terrainInstance || (!terrainInstance.mesh && !terrainInstance.cubeInstancesMesh) || !terrainInstance.vertexTerrainTypes) return; // Check for either mesh or cubes
+
+            // Only perform procedural placement if no manual objects have been placed/loaded
+            if (terrainInstance.placedObjectsData.length > 0) {
+                console.log(`LOG: Skipping procedural object placement for terrain ${terrainInstance.id} as it contains existing objects.`);
+                return; 
+            }
+
+            // Ensure objectsGroup exists and is added to worldGroup
+            if (!terrainInstance.objectsGroup) {
+                terrainInstance.objectsGroup = new THREE.Group();
+                terrainInstance.objectsGroup.position.set(terrainInstance.offset.x, terrainInstance.offset.y, terrainInstance.offset.z);
+                worldGroup.add(terrainInstance.objectsGroup);
+            }
+
+            // Clear existing objects (only if we're doing a fresh procedural generation)
+            while (terrainInstance.objectsGroup.children.length > 0) {
+                const object = terrainInstance.objectsGroup.children[0];
+                disposeThreeObject(object);
+                terrainInstance.objectsGroup.remove(object);
+            }
+            terrainInstance.placedObjectsData = []; // Clear saved object data
+
+            // Use the geometryData's positions for object placement, as it's the source of truth for heights
+            const terrainPositions = terrainInstance.geometryData.topSurfacePositions;
+            const numTopVertices = (terrainInstance.config.segments + 1) * (terrainInstance.config.segments + 1);
+
+            let placedCount = { tree: 0, rock_obj: 0 };
+
+            // Iterate through top surface vertices to decide object placement
+            for (let i = 0; i < numTopVertices; i++) {
+                const terrainType = terrainInstance.vertexTerrainTypes[i];
+                const x = terrainPositions[i * 3];
+                const y_surface = terrainPositions[i * 3 + 1];
+                const z = terrainPositions[i * 3 + 2];
+
+                if (terrainType === TERRAIN_TYPES.GRASS && Math.random() < terrainInstance.config.treePlacementProbability) {
+                    // Place a tree on grass
+                    const treeHeight = 2 + Math.random() * 3; // Random height
+                    const treeScale = 0.5 + Math.random() * 0.5; // Random scale
+                    const treeGeometry = new THREE.BoxGeometry(treeScale, treeHeight, treeScale);
+                    const treeMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Forest green
+                    const tree = new THREE.Mesh(treeGeometry, treeMaterial);
+                    tree.position.set(x, y_surface + treeHeight / 2, z); // Position on surface
+                    tree.castShadow = true;
+                    tree.receiveShadow = true;
+                    terrainInstance.objectsGroup.add(tree);
+                    terrainInstance.placedObjectsData.push({
+                        type: PLACED_OBJECT_TYPES.TREE,
+                        position: { x: tree.position.x, y: tree.position.y, z: tree.position.z },
+                        scale: { x: treeScale, y: treeHeight, z: treeScale }
+                    });
+                    placedCount.tree++;
+                } else if (terrainType === TERRAIN_TYPES.ROCK && Math.random() < terrainInstance.config.rockPlacementProbability) {
+                    // Place a rock on rocky terrain
+                    const rockRadius = 0.5 + Math.random() * 1; // Random radius
+                    const rockGeometry = new THREE.SphereGeometry(rockRadius, 8, 6); // Low-poly sphere for rock
+                    const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x696969 }); // Gray rock color
+                    const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+                    rock.position.set(x, y_surface + rockRadius, z); // Position on surface
+                    rock.castShadow = true;
+                    rock.receiveShadow = true;
+                    terrainInstance.objectsGroup.add(rock);
+                    terrainInstance.placedObjectsData.push({
+                        type: PLACED_OBJECT_TYPES.ROCK_OBJ,
+                        position: { x: rock.position.x, y: rock.position.y, z: rock.position.z },
+                        scale: { radius: rockRadius }
+                    });
+                    placedCount.rock_obj++;
+                }
+            }
+            console.log(`LOG: Procedurally placed objects on terrain ${terrainInstance.id}: Trees: ${placedCount.tree}, Rocks: ${placedCount.rock_obj}`);
+        }
+
+        /**
+         * Loads and places saved decorative objects onto a terrain instance.
+         * This function is additive and will not clear existing objects.
+         * @param {object} terrainInstance - The terrain instance to load objects onto.
+         * @param {Array<object>} savedObjects - An array of saved object data.
+         */
+        function loadAndPlaceSavedObjects(terrainInstance, savedObjects) {
+            if (!terrainInstance) return;
+
+            // Ensure objectsGroup exists and is added to worldGroup
+            if (!terrainInstance.objectsGroup) {
+                terrainInstance.objectsGroup = new THREE.Group();
+                terrainInstance.objectsGroup.position.set(terrainInstance.offset.x, terrainInstance.offset.y, terrainInstance.offset.z);
+                worldGroup.add(terrainInstance.objectsGroup);
+            }
+
+            // Clear existing objects before loading new ones (only if we're doing a full load)
+            // For this iteration, we assume loadAndPlaceSavedObjects is called after clearing,
+            // or for a fresh load where objectsGroup is already empty.
+            // If we wanted to merge, this logic would change.
+            while (terrainInstance.objectsGroup.children.length > 0) {
+                const object = terrainInstance.objectsGroup.children[0];
+                disposeThreeObject(object);
+                terrainInstance.objectsGroup.remove(object);
+            }
+            terrainInstance.placedObjectsData = []; // Clear saved object data before loading
+
+            savedObjects.forEach(objectData => {
+                let mesh;
+                if (objectData.type === PLACED_OBJECT_TYPES.TREE) {
+                    const treeHeight = objectData.scale?.y || 3;
+                    const treeScale = objectData.scale?.x || .75;
+                    const treeGeometry = new THREE.BoxGeometry(treeScale, treeHeight, treeScale);
+                    const treeMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                    mesh = new THREE.Mesh(treeGeometry, treeMaterial);
+                } else if (objectData.type === PLACED_OBJECT_TYPES.ROCK_OBJ) {
+                    const rockRadius = objectData.scale?.radius || 1;
+                    const rockGeometry = new THREE.SphereGeometry(rockRadius, 8, 6);
+                    const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x696969 });
+                    mesh = new THREE.Mesh(rockGeometry, rockMaterial);
+                }
+
+                if (mesh) {
+                    mesh.position.set(objectData.position.x, objectData.position.y, objectData.position.z);
+                    // Apply scale if present in objectData
+                    if (objectData.scale.x && objectData.scale.y && objectData.scale.z) {
+                        mesh.scale.set(objectData.scale.x, objectData.scale.y, objectData.scale.z);
+                    } else if (objectData.scale.radius) {
+                        mesh.scale.set(objectData.scale.radius, objectData.scale.radius, objectData.scale.radius);
+                    }
+                    
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    terrainInstance.objectsGroup.add(mesh);
+                    terrainInstance.placedObjectsData.push(objectData); // Store the loaded data
+                }
+            });
+            console.log(`LOG: Loaded and placed ${savedObjects.length} objects for terrain ${terrainInstance.id}.`);
+        }
+
+        /**
+         * Clears all manually and procedurally placed objects from the active terrain.
+         * This function is called by the new "Clear All Placed Objects" button.
+         */
+        function clearAllPlacedObjects(terrainInstance = getActiveTerrain()) {
+            if (!terrainInstance || !terrainInstance.objectsGroup) {
+                displayGlobalError("No active terrain to clear objects from.", "clear-objects-no-active");
+                return;
+            }
+            // Save state BEFORE clearing objects, so undo can restore them
+            saveStateToHistory(); 
+            console.log(`LOG: Clearing all placed objects from terrain ${terrainInstance.id}.`);
+            while (terrainInstance.objectsGroup.children.length > 0) {
+                const object = terrainInstance.objectsGroup.children[0];
+                disposeThreeObject(object);
+                terrainInstance.objectsGroup.remove(object);
+            }
+            terrainInstance.placedObjectsData = []; // Clear saved object data
+        }
+
+        /**
+         * Returns the currently active terrain instance object.
+         * @returns {object|null} The active terrain instance or null if none is active.
+         */
+        function getActiveTerrain() {
+            return activeTerrainIndex !== -1 && worldTerrains[activeTerrainIndex] ? worldTerrains[activeTerrainIndex] : null;
+        }
+
+        /**
+         * Sets a terrain instance as active by its index.
+         * Updates the UI to reflect the new active terrain's settings.
+         * @param {number} index - The index of the terrain to set as active.
+         */
+        function setActiveTerrain(index) {
+            if (index >= 0 && index < worldTerrains.length) {
+                // Save state before changing active terrain, as this is a significant context switch
+                saveStateToHistory(); 
+                activeTerrainIndex = index;
+                updateUIForActiveTerrain(); // Update UI controls
+            } else {
+                activeTerrainIndex = -1; // No active terrain
+                updateUIForActiveTerrain(); // Reset UI to default/global settings
+            }
+            renderWorldTerrainList(); // Re-render the list to highlight active terrain
+        }
+
+        /**
+         * Handles adding a new terrain instance from a loaded JSON file.
+         * @param {Event} event - The file input change event.
+         */
+        async function addTerrainFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            showLoading(); // Show loading indicator
+            try {
+                const loadedData = await readFileAsJSON(file);
+
+                // Validate loaded data structure
+                if (!loadedData.config || !loadedData.geometry) {
+                    throw new Error("Invalid terrain file format: missing config or geometry data.");
+                }
+
+                const newId = loadedData.id || generateUniqueId('t_loaded');
+                const newOffset = loadedData.offset || { x: 0, y: 0, z: 0 };
+                const newTerrain = createNewTerrainInstance(newId, loadedData.config, newOffset);
+                
+                // Merge loaded config, ensuring backward compatibility for terrainThickness
+                Object.assign(newTerrain.config, loadedData.config);
+                if (newTerrain.config.terrainThickness === undefined) {
+                    // For older versions (1.2, 1.3) that might not have thickness in config
+                    newTerrain.config.terrainThickness = (loadedData.version === "1.3" || loadedData.version === "1.2") ? 10 : defaultConfig.terrainThickness;
+                }
+
+                // Load tool settings if available
+                newTerrain.toolSettings = loadedData.toolSettings || deepCopy(newTerrain.toolSettings);
+
+                worldTerrains.push(newTerrain);
+                const newIndex = worldTerrains.length - 1;
+
+                // Create or update the 3D mesh using loaded geometry data
+                createOrUpdateTerrainInstance(newTerrain, 
+                    loadedData.geometry.topSurfacePositions || loadedData.geometry.positions, // Handle older 'positions' key
+                    loadedData.geometry.terrainTypes
+                );
+
+                // Load and place saved objects if available, otherwise generate new ones
+                if (loadedData.placedObjects && Array.isArray(loadedData.placedObjects)) {
+                    loadAndPlaceSavedObjects(newTerrain, loadedData.placedObjects);
+                } else {
+                    // If no placed objects data, perform initial procedural placement
+                    placeObjects(newTerrain); 
+                }
+
+                setActiveTerrain(newIndex); // Set the newly added terrain as active
+                console.log(`LOG: Terrain "${newId}" loaded successfully.`);
+                saveStateToHistory(); // Save state after adding terrain
+
+            } catch (err) {
+                displayGlobalError(`Error loading terrain from file: ${err.message}`, "load-terrain-file-err");
+            } finally {
+                hideLoading(); // Hide loading indicator
+                if (event.target) event.target.value = null; // Clear file input
+            }
+        }
+
+        /**
+         * Regenerates the active terrain instance using its current configuration.
+         * This will re-generate the terrain mesh but preserve manually placed objects.
+         */
+        function regenerateActiveTerrain() {
+            const activeTerrain = getActiveTerrain();
+            if (activeTerrain) {
+                showLoading(); // Show loading indicator
+                // Use a small delay to allow loading indicator to render
+                setTimeout(() => {
+                    // Pass null for loaded positions/types to force re-generation from noise
+                    createOrUpdateTerrainInstance(activeTerrain, null, null); 
+                    // We do NOT call placeObjects here, as it would clear manual objects.
+                    // If the user wants new procedural objects, they should use "Clear All Placed Objects" first.
+                    hideLoading(); // Hide loading indicator
+                    saveStateToHistory(); // Save state after regeneration
+                }, 50);
+            } else {
+                displayGlobalError("No active terrain to regenerate. Please add or select a terrain.", "regen-no-active");
+            }
+        }
+
+        /**
+         * Saves the data of the currently active terrain instance to a JSON file.
+         */
+        function saveActiveTerrainData() {
+            const activeTerrain = getActiveTerrain();
+            if (!activeTerrain || !activeTerrain.geometryData) {
+                displayGlobalError("No active terrain or terrain data to save.", "save-active-no");
+                return;
+            }
+
+            const savedData = {
+                version: "1.3", // Version of the terrain file format
+                id: activeTerrain.id,
+                config: deepCopy(activeTerrain.config),
+                toolSettings: { // Save current tool settings for this terrain
+                    currentToolMode: currentToolMode,
+                    currentPaintType: currentPaintType,
+                    currentPlaceObjectType: currentPlaceObjectType, // Save new tool setting
+                    brushSize: brushSize,
+                    sculptStrength: sculptStrength,
+                    objectPlacementScale: objectPlacementScale // Save new tool setting
+                },
+                offset: deepCopy(activeTerrain.offset), // Save terrain's world offset
+                geometry: activeTerrain.geometryData, // Contains top surface positions and terrain types
+                placedObjects: deepCopy(activeTerrain.placedObjectsData), // Data for placed decorative objects
+                // Save camera state relative to this terrain (optional, but useful for scene recall)
+                cameraState: {
+                    position: camera.position.toArray(),
+                    target: controls ? controls.target.toArray() : initialCameraTarget.toArray()
+                }
+            };
+            triggerJSONDownload(savedData, `terrain_s_${activeTerrain.id.substring(0, 5)}_${Date.now()}.json`);
+            // No history save for explicit save operations
+        }
+
+        /**
+         * Renders (or re-renders) the list of world terrains in the UI.
+         * Allows setting active terrain, changing offsets, and removing terrains.
+         */
+        function renderWorldTerrainList() {
+            const listElement = getElement('worldTerrainList');
+            if (!listElement) return;
+
+            listElement.innerHTML = ''; // Clear existing list items
+
+            worldTerrains.forEach((terrain, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.innerHTML = `<span class="list-item-id">T${index + 1}(${terrain.id.substring(0, 8)})</span> `;
+                
+                // Highlight the active terrain
+                if (index === activeTerrainIndex) {
+                    itemDiv.classList.add('active-terrain-item');
+                }
+
+                // Add offset input fields (X, Y, Z)
+                ['x', 'y', 'z'].forEach(axis => {
+                    const label = document.createElement('label');
+                    label.textContent = `${axis.toUpperCase()}:`;
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.value = terrain.offset[axis];
+                    input.step = defaultConfig.gridCellSize; // Snap to grid cell size
+                    input.addEventListener('change', (event) => {
+                        let newOffsetValue = parseFloat(event.target.value) || 0;
+                        // Apply grid snapping for X, Z, and optionally Y
+                        if (axis === 'x' || axis === 'z' || (axis === 'y' && defaultConfig.snapYToGrid)) {
+                            newOffsetValue = Math.round(newOffsetValue / defaultConfig.gridCellSize) * defaultConfig.gridCellSize;
+                        }
+                        terrain.offset[axis] = newOffsetValue;
+                        input.value = newOffsetValue; // Update input field to snapped value
+                        
+                        // Update the position of the Three.js meshes
+                        if (terrain.mesh) terrain.mesh.position[axis] = terrain.offset[axis];
+                        if (terrain.waterMesh) terrain.waterMesh.position[axis] = terrain.offset[axis] + (axis === 'y' ? terrain.config.waterLevel : 0);
+                        if (terrain.objectsGroup) terrain.objectsGroup.position[axis] = terrain.offset[axis];
+                        if (terrain.cubeInstancesMesh) terrain.cubeInstancesMesh.position[axis] = terrain.offset[axis]; // New: Update cube position
+                        saveStateToHistory(); // Save state after manual offset change
+                    });
+                    itemDiv.appendChild(label);
+                    itemDiv.appendChild(input);
+                });
+
+                // Add "Set Active" button
+                const setActiveButton = document.createElement('button');
+                setActiveButton.textContent = 'Set Active';
+                setActiveButton.classList.add('world-terrain-button');
+                setActiveButton.onclick = () => setActiveTerrain(index);
+                itemDiv.appendChild(setActiveButton);
+
+                // Add "Remove" button
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove';
+                removeButton.classList.add('world-terrain-button');
+                removeButton.style.backgroundColor = '#f44336'; // Red color for remove
+                removeButton.onclick = () => removeTerrainFromWorld(index);
+                itemDiv.appendChild(removeButton);
+
+                listElement.appendChild(itemDiv);
+            });
+        }
+
+        /**
+         * Removes a terrain instance from the world.
+         * Disposes its Three.js objects and updates the active terrain index.
+         * @param {number} index - The index of the terrain to remove.
+         */
+        function removeTerrainFromWorld(index) {
+            if (index < 0 || index >= worldTerrains.length) return;
+
+            // Save state BEFORE removing, so undo can restore it
+            saveStateToHistory(); 
+
+            const removedTerrain = worldTerrains.splice(index, 1)[0];
+            if (removedTerrain) {
+                // Dispose of Three.js objects to free memory
+                disposeThreeObject(removedTerrain.mesh);
+                disposeThreeObject(removedTerrain.waterMesh);
+                disposeThreeObject(removedTerrain.objectsGroup);
+                disposeThreeObject(removedTerrain.cubeInstancesMesh); // New: Dispose cube mesh
+
+                // Remove from scene's world group
+                if (removedTerrain.mesh) worldGroup.remove(removedTerrain.mesh);
+                if (removedTerrain.waterMesh) worldGroup.remove(removedTerrain.waterMesh);
+                if (removedTerrain.objectsGroup) worldGroup.remove(removedTerrain.objectsGroup);
+                if (removedTerrain.cubeInstancesMesh) worldGroup.remove(removedTerrain.cubeInstancesMesh); // New: Remove cube mesh
+            }
+
+            // Adjust activeTerrainIndex if the removed terrain was active or before the active one
+            if (activeTerrainIndex === index) {
+                setActiveTerrain(worldTerrains.length > 0 ? 0 : -1); // Set first terrain as active or none
+            } else if (activeTerrainIndex > index) {
+                activeTerrainIndex--; // Shift index if terrain before active was removed
+                setActiveTerrain(activeTerrainIndex); // Re-set active to trigger UI update
+            }
+            renderWorldTerrainList(); // Re-render the list
+        }
+
+        /**
+         * Saves the entire world state (all terrains and global settings) to a JSON file.
+         */
+        function saveWorldData() {
+            // Map terrain instances to a serializable format
+            const worldDataTerrains = worldTerrains.map(terrain => ({
+                id: terrain.id,
+                config: terrain.config,
+                toolSettings: terrain.toolSettings || { brushSize, sculptStrength, currentToolMode, currentPaintType, currentPlaceObjectType, objectPlacementScale }, // Ensure tool settings are saved
+                geometryData: terrain.geometryData,
+                placedObjectsData: terrain.placedObjectsData,
+                offset: terrain.offset
+            }));
+
+            const savedData = {
+                version: "world-1.2", // Version of the world file format
+                gridConfig: { // Save global grid settings
+                    gridCellSize: defaultConfig.gridCellSize,
+                    gridDisplaySize: defaultConfig.gridDisplaySize,
+                    showGrid: defaultConfig.showGrid,
+                    snapYToGrid: defaultConfig.snapYToGrid,
+                    showCubeRepresentation: defaultConfig.showCubeRepresentation, // New: Save cube representation setting
+                    gridColorCenter: defaultConfig.gridColorCenter,
+                    gridColorLines: defaultConfig.gridColorLines,
+                    gridOpacity: defaultConfig.gridOpacity
+                },
+                worldTerrains: worldDataTerrains,
+                cameraState: { // Save current camera position and target
+                    position: camera.position.toArray(),
+                    target: controls ? controls.target.toArray() : initialCameraTarget.toArray()
+                },
+                activeTerrainIndex: activeTerrainIndex // Save the index of the active terrain
+            };
+            triggerJSONDownload(savedData, `world_grid_${Date.now()}.world.json`);
+            // No history save for explicit save operations
+        }
+
+        /**
+         * Loads a complete world state from a JSON file.
+         * Clears existing terrains and reconstructs the world.
+         * @param {Event} event - The file input change event.
+         */
+        async function loadWorldData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            showLoading(); // Show loading indicator
+            try {
+                const loadedWorld = await readFileAsJSON(file);
+
+                if (!loadedWorld.worldTerrains || !Array.isArray(loadedWorld.worldTerrains)) {
+                    throw new Error("Invalid world file format: missing 'worldTerrains' array.");
+                }
+
+                // Save current state before loading new world, so undo can revert to it
+                saveStateToHistory(); 
+
+                // Dispose of all current terrains before loading new ones
+                worldTerrains.forEach(disposeTerrainInstance);
+                worldTerrains = [];
+                activeTerrainIndex = -1;
+
+                // Load grid configuration if available
+                if (loadedWorld.gridConfig) {
+                    Object.assign(defaultConfig, loadedWorld.gridConfig);
+                }
+                updateGridHelper(); // Update grid visual based on loaded config
+
+                // Reconstruct each terrain instance
+                loadedWorld.worldTerrains.forEach((terrainData, index) => {
+                    const newId = terrainData.id || generateUniqueId(`lt_${index}`);
+                    const newConfig = terrainData.config || defaultConfig;
+                    const newOffset = terrainData.offset || { x: 0, y: 0, z: 0 };
+                    
+                    const newTerrain = createNewTerrainInstance(newId, newConfig, newOffset);
+                    newTerrain.toolSettings = terrainData.toolSettings || deepCopy(newTerrain.toolSettings);
+
+                    // Backward compatibility for terrainThickness
+                    if (newConfig.terrainThickness === undefined) {
+                        newConfig.terrainThickness = (terrainData.version === "1.3" || terrainData.version === "1.2") ? 10 : defaultConfig.terrainThickness;
+                    }
+
+                    worldTerrains.push(newTerrain);
+
+                    // Create or update mesh using loaded geometry data
+                    if (terrainData.geometryData) {
+                        createOrUpdateTerrainInstance(newTerrain, 
+                            terrainData.geometryData.topSurfacePositions || loadedData.geometry.positions, // Handle older 'positions' key
+                            terrainData.geometry.terrainTypes
+                        );
+                    }
+
+                    // Load and place saved objects or generate new ones
+                    if (terrainData.placedObjectsData && Array.isArray(terrainData.placedObjectsData)) {
+                        loadAndPlaceSavedObjects(newTerrain, terrainData.placedObjectsData);
+                    } else {
+                        placeObjects(newTerrain); // Generate new objects if none saved
+                    }
+                });
+
+                // Restore camera state if available
+                if (loadedWorld.cameraState && camera && controls) {
+                    camera.position.fromArray(loadedWorld.cameraState.position);
+                    controls.target.fromArray(loadedWorld.cameraState.target);
+                    controls.update();
+                } else {
+                    resetCamera(); // Fallback to default camera if no state saved
+                }
+
+                // Set the active terrain
+                setActiveTerrain(
+                    loadedWorld.activeTerrainIndex !== undefined && loadedWorld.activeTerrainIndex < worldTerrains.length ? 
+                    loadedWorld.activeTerrainIndex : 
+                    (worldTerrains.length > 0 ? 0 : -1) // Default to first terrain or none
+                );
+                console.log(`LOG: World loaded successfully with ${worldTerrains.length} terrains.`);
+                // State is already saved by setActiveTerrain if it changes active terrain.
+                // If no active terrain change, we still need to save the loaded world state.
+                if (loadedWorld.activeTerrainIndex === activeTerrainIndex) {
+                    saveStateToHistory(); 
+                }
+
+            } catch (err) {
+                displayGlobalError(`Error loading world: ${err.message}`, "load-world-err");
+            } finally {
+                hideLoading(); // Hide loading indicator
+                if (event.target) event.target.value = null; // Clear file input
+            }
+        }
+
+        /**
+         * Handles the click event for generating lore using Gemini API.
+         * @param {string|null} customBasePrompt - An optional custom prompt to start with.
+         */
+        async function handleGenerateLoreClick(customBasePrompt = null) { 
+            const activeTerrain = getActiveTerrain();
+            if (!activeTerrain) {
+                displayGlobalError("Please select an active terrain to generate lore for.", "lore-no-active");
+                return;
+            }
+
+            showLoading(true); // Show Gemini-specific loading indicator
+            loreTextElement.textContent = "Generating lore..."; // Set initial text in modal
+            loreModal.style.display = "block"; // Show the lore modal
+
+            let prompt;
+            if (customBasePrompt) {
+                prompt = customBasePrompt;
+                // Add specific terrain details to the custom prompt
+                prompt += ` Terrain dimensions approx ${activeTerrain.config.terrainWidth}x${activeTerrain.config.terrainDepth} meters, with a maximum height of ${activeTerrain.config.terrainHeightScale} meters and a thickness of ${activeTerrain.config.terrainThickness} meters.`;
+            } else {
+                // Construct a general prompt based on terrain characteristics
+                prompt = `Generate a concise lore (2-4 sentences) for a 3D terrain with the following characteristics:
+                Dimensions: ${activeTerrain.config.terrainWidth}m x ${activeTerrain.config.terrainDepth}m.
+                Max Height: ${activeTerrain.config.terrainHeightScale}m.
+                Thickness: ${activeTerrain.config.terrainThickness}m.
+                Shape: `;
+                if (activeTerrain.config.terrainHeightScale > 20) {
+                    prompt += "Features prominent mountains and deep valleys. ";
+                } else if (activeTerrain.config.terrainHeightScale > 5) {
+                    prompt += "Characterized by rolling hills and gentle slopes. ";
+                } else {
+                    prompt += "A relatively flat plain. ";
+                }
+
+                if (activeTerrain.config.waterLevel > -10) {
+                    prompt += "Includes significant bodies of water. ";
+                } else {
+                    prompt += "Mostly dry with scarce water features. ";
+                }
+
+                // Determine dominant terrain types
+                const terrainTypeCounts = {};
+                if (activeTerrain.vertexTerrainTypes && activeTerrain.vertexTerrainTypes.length > 0) {
+                    activeTerrain.vertexTerrainTypes.forEach(typeId => {
+                        const typeName = Object.keys(TERRAIN_TYPES).find(key => TERRAIN_TYPES[key] === typeId);
+                        if (typeName) {
+                            terrainTypeCounts[typeName] = (terrainTypeCounts[typeName] || 0) + 1;
+                        }
+                    });
+                    const sortedTypes = Object.entries(terrainTypeCounts).sort(([, a], [, b]) => b - a);
+                    if (sortedTypes.length > 0) {
+                        const dominantTypes = sortedTypes.slice(0, 2).map(entry => entry[0].toLowerCase()).join(" and ");
+                        prompt += `Dominant terrain types: ${dominantTypes}. `;
+                    } else {
+                        prompt += `Dominant terrain types: various. `;
+                    }
+                } else {
+                    prompt += `Dominant terrain types: various. `;
+                }
+                
+                prompt += `What ancient secrets or untold stories might this land hold?`;
+            }
+
+            try {
+                const generatedText = await callGeminiAPI(prompt, `Lore for terrain ${activeTerrain.id}`); 
+                if (generatedText) {
+                    loreTextElement.textContent = generatedText;
+                } else {
+                    loreTextElement.textContent = "Failed to generate lore (no text returned or API error).";
+                }
+            } catch (error) {
+                loreTextElement.textContent = "Lore generation failed: " + error.message;
+                displayGlobalError("Gemini API error: " + error.message, "gemini-api-err");
+            } finally {
+                hideLoading(true); // Hide Gemini-specific loading indicator
+            }
+        }
+
+        /**
+         * The main animation loop for Three.js rendering.
+         */
+        function animate() {
+            requestAnimationFrame(animate); // Request the next animation frame
+
+            // Log the first frame to confirm animation loop started
+            if (animationFrameCount++ === 0 && renderer) {
+                console.log("LOG: animate() first frame rendered.");
+            }
+
+            // Smooth camera transition to a new target position
+            if (isFocusTransitioning && newTargetPosition && controls) {
+                controls.target.lerp(newTargetPosition, focusSmoothingFactor);
+                // If camera is very close to target, snap to it and end transition
+                if (controls.target.distanceTo(newTargetPosition) < 0.01) {
+                    controls.target.copy(newTargetPosition);
+                    isFocusTransitioning = false;
+                    newTargetPosition = null;
+                }
+            }
+
+            if (controls) {
+                controls.update(); // Update OrbitControls (for damping, panning, etc.)
+            }
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera); // Render the scene
+            }
+        }
+
+        /**
+         * Handles window resizing events to adjust camera aspect ratio and renderer size.
+         */
+        function onWindowResize() {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix(); // Update camera's projection matrix
+                renderer.setSize(window.innerWidth, window.innerHeight); // Resize renderer
+            }
+        }
+        
+        // --- Entry Point ---
+        // Initialize the application when the window has fully loaded.
+        window.onload = () => { 
+            console.log("Diag: window.onload event fired. Starting init()."); 
+            init(); 
+        };
+    </script>
+</body>
+</html>

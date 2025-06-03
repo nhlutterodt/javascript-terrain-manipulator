@@ -1,0 +1,157 @@
+/*
+  styles.css
+  Centralized, modular, and enhanced CSS for Javascript World Generator
+  Naming: BEM-style for unique addressability
+  Utility: CSS variables for theme, helper classes for state
+*/
+
+:root {
+  --color-bg: #1a1a1a;
+  --color-fg: #e0e0e0;
+  --color-accent: #61dafb;
+  --color-border: #444;
+  --color-btn: #555;
+  --color-btn-active: #61dafb;
+  --color-btn-remove: #f44336;
+  --radius: 8px;
+  --padding: 10px;
+  --input-width: 60px;
+}
+
+/* Layout Blocks */
+.controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(40,40,40,0.9);
+  padding: var(--padding);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 10;
+  max-height: 90vh;
+  overflow-y: auto;
+  width: 380px;
+}
+
+.controls__group {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+.controls__group:last-child { border-bottom: none; }
+
+.controls__title {
+  color: var(--color-accent);
+  margin: 0 0 10px 0;
+  font-size: 1.1em;
+}
+
+/* Terrain List */
+.terrain-list {
+  max-height: 150px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  padding: 5px;
+}
+.terrain-list__item {
+  background: #333;
+  padding: 8px;
+  margin-bottom: 5px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.terrain-list__item--active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 5px var(--color-accent);
+}
+.terrain-list__label {
+  font-size: 0.8em;
+  margin-right: 5px;
+  color: #ccc;
+}
+.terrain-list__input {
+  width: var(--input-width);
+  padding: 4px;
+  margin-right: 5px;
+  font-size: 0.9em;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #333;
+  color: var(--color-fg);
+}
+
+/* Buttons */
+.btn,
+.file-input-label {
+  background: var(--color-btn);
+  color: var(--color-fg);
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s, color 0.3s;
+  font-size: 1em;
+  line-height: normal;
+  margin-right: 5px;
+}
+.btn:hover, .file-input-label:hover { background: #777; }
+.btn--action { background: var(--color-accent); color: var(--color-bg); }
+.btn--remove { background: var(--color-btn-remove); color: #fff; }
+.btn--active { border: 2px solid #fff; }
+
+/* Utility */
+.is-active { outline: 2px solid var(--color-accent); }
+.is-disabled { opacity: 0.5; pointer-events: none; }
+
+/* Spinner and loading overlay for app phases */
+.app-loading-spinner {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20,20,20,0.85);
+}
+.app-loading-spinner-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.spinner {
+    width: 60px; height: 60px;
+    border: 8px solid #eee;
+    border-top: 8px solid #61dafb;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+.spinner-label {
+    margin-top: 18px;
+    color: #fff;
+    font-size: 1.2em;
+    letter-spacing: 0.04em;
+}
+@keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+
+/* Utility classes for margin, flex, etc. */
+.flex-row { display: flex; flex-direction: row; }
+.flex-col { display: flex; flex-direction: column; }
+.align-center { align-items: center; }
+.justify-center { justify-content: center; }
+.mt-10 { margin-top: 10px; }
+.mb-10 { margin-bottom: 10px; }
+.mr-5 { margin-right: 5px; }
+.ml-15 { margin-left: 15px; }
+
+.terrain-input-x,
+.terrain-input-y,
+.terrain-input-z {
+    width: 60px;
+}
+.remove-terrain-btn {
+    background-color: rgb(244, 67, 54) !important;
+}

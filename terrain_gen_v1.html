@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Procedural World Generator</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #controls-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(40, 40, 40, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10;
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 380px; /* Adjusted width for new controls */
+        }
+        .control-group {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+        }
+        .control-group:last-child {
+            border-bottom: none;
+        }
+        h3 {
+            color: #61dafb;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        input[type="range"], input[type="number"], select, input[type="checkbox"], input[type="color"] {
+            width: calc(100% - 20px);
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #e0e0e0;
+            box-sizing: border-box;
+        }
+        input[type="range"] { padding: 0; }
+        input[type="checkbox"] { width: auto; margin-right: 5px; vertical-align: middle;}
+        input[type="color"] {
+            height: 30px; /* Standard height for color input */
+            padding: 2px; /* Minimal padding for color swatch */
+            margin-bottom: 10px;
+            border: 1px solid #555;
+            background: none; /* Remove default background */
+        }
+
+        button, .file-input-label { 
+            background-color: #555; 
+            color: #e0e0e0;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+            box-sizing: border-box;
+            display: inline-block; 
+            text-align: center; 
+            font-size: 1em; 
+            line-height: normal; 
+        }
+        button:hover, .file-input-label:hover { background-color: #777; }
+        button.action-button { background-color: #61dafb; color: #1a1a1a; }
+        button.action-button:hover { background-color: #82eaff; }
+        button.secondary, .file-input-label.secondary { background-color: #4CAF50; color: white; }
+        button.secondary:hover, .file-input-label.secondary:hover { background-color: #66bb6a; }
+        button.gemini-button { background-color: #8A2BE2; color: white; }
+        button.gemini-button:hover { background-color: #9932CC; }
+        button.theme-button { background-color: #3f51b5; color: white; }
+        button.theme-button:hover { background-color: #5c6bc0; }
+        input[type="file"] { display: none; }
+        .tool-button, .world-terrain-button { width: calc(50% - 5px); margin-bottom: 5px; padding: 8px 10px; font-size: 0.9em; }
+        .world-terrain-button { width: auto; margin-right: 5px; }
+        .tool-button.active { background-color: #61dafb; color: #1a1a1a; border: 2px solid #fff; }
+        .button-row { display: flex; justify-content: space-between; flex-wrap: wrap; }
+        #worldTerrainList div { background-color: #333; padding: 8px; margin-bottom: 5px; border-radius: 4px; border: 1px solid #444; }
+        #worldTerrainList div.active-terrain-item { border-color: #61dafb; box-shadow: 0 0 5px #61dafb; }
+        #worldTerrainList label { font-size: 0.8em; margin-right: 5px; }
+        #worldTerrainList input[type="number"] { width: 60px; padding: 4px; margin-right: 5px; font-size: 0.9em; }
+        #info { position: absolute; bottom: 10px; left: 10px; background-color: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 3px; font-size: 0.8em; }
+        #loading-indicator, #gemini-loading-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5em; color: #fff; background-color: rgba(0,0,0,0.7); padding: 20px; border-radius: 8px; display: none; z-index: 100; }
+        canvas { display: block; cursor: default; } 
+        .critical-error-message { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background-color:rgba(220,53,69,0.9); color:white; padding:10px 15px; border-radius:5px; z-index:10000; font-size: 0.9em; box-shadow: 0 2px 10px rgba(0,0,0,0.2); text-align:center; }
+        .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+        .modal-content { background-color: #282828; color: #e0e0e0; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-header { padding-bottom: 10px; border-bottom: 1px solid #444; font-size: 1.2em; color: #61dafb; }
+        .modal-body { padding-top: 10px; line-height: 1.6; max-height: 300px; overflow-y: auto;}
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: #fff; text-decoration: none; cursor: pointer; }
+        .app-loading-spinner {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(20,20,20,0.85);
+        }
+        .app-loading-spinner-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .spinner {
+            width: 60px; height: 60px;
+            border: 8px solid #eee;
+            border-top: 8px solid #61dafb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .spinner-label {
+            margin-top: 18px;
+            color: #fff;
+            font-size: 1.2em;
+            letter-spacing: 0.04em;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app-loading-spinner" class="app-loading-spinner">
+        <div class="app-loading-spinner-inner">
+            <div class="spinner"></div>
+            <div class="spinner-label">Loading 3D Engine...</div>
+        </div>
+    </div>
+    <div id="controls-container">
+        <div class="control-group">
+            <h3>Active Terrain Config</h3>
+            <label for="terrainWidth">Width: <span id="terrainWidthVal">200</span>m
+              <input type="range" id="terrainWidth" name="terrainWidth" min="50" max="500" value="200" step="10" autocomplete="off">
+            </label>
+            <label for="terrainDepth">Depth: <span id="terrainDepthVal">200</span>m
+              <input type="range" id="terrainDepth" name="terrainDepth" min="50" max="500" value="200" step="10" autocomplete="off">
+            </label>
+            <label for="segments">Segments: <span id="segmentsVal">100</span>
+              <input type="range" id="segments" name="segments" min="20" max="250" value="100" step="5" autocomplete="off">
+            </label>
+            <label for="terrainThickness">Thickness: <span id="terrainThicknessVal">10</span>m
+              <input type="range" id="terrainThickness" name="terrainThickness" min="0" max="50" value="10" step="1" autocomplete="off">
+            </label>
+            <button id="generateLoreButton" class="gemini-button">✨ Generate Custom Lore</button>
+        </div>
+
+           <div class="control-group">
+            <h3>Default Lore & Terrain Themes</h3>
+            <div class="button-row">
+                <button class="theme-button" data-theme="mystic_mountains">Mystic Peaks</button>
+                <button class="theme-button" data-theme="forgotten_desert">Forgotten Desert</button>
+            </div>
+            <div class="button-row">
+                <button class="theme-button" data-theme="sunken_ruins">Sunken Ruins</button>
+                <button class="theme-button" data-theme="crystal_caves">Crystal Caves</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>Active Terrain Noise</h3>
+            <label for="noiseScale">Scale: <span id="noiseScaleVal">70</span></label>
+            <input type="range" id="noiseScale" name="noiseScale" min="10" max="200" value="70" step="1">
+            <label for="terrainHeightScale">Max Height: <span id="terrainHeightScaleVal">30</span>m</label>
+            <input type="range" id="terrainHeightScale" name="terrainHeightScale" min="5" max="100" value="30" step="1">
+            <label for="octaves">Octaves: <span id="octavesVal">4</span></label>
+            <input type="range" id="octaves" name="octaves" min="1" max="8" value="4" step="1">
+            <label for="persistence">Persistence: <span id="persistenceVal">0.5</span></label>
+            <input type="range" id="persistence" name="persistence" min="0.1" max="1" value="0.5" step="0.05">
+            <label for="lacunarity">Lacunarity: <span id="lacunarityVal">2.0</span></label>
+            <input type="range" id="lacunarity" name="lacunarity" min="1.5" max="4" value="2.0" step="0.1">
+        </div>
+
+        <div class="control-group">
+            <h3>Active Terrain Features</h3>
+            <label for="plateauLevel">Plateau Level: <span id="plateauLevelVal">0.0</span></label>
+            <input type="range" id="plateauLevel" name="plateauLevel" min="0" max="1" value="0.0" step="0.05">
+            <label for="plateauSmoothing">Plateau Smooth: <span id="plateauSmoothingVal">0.1</span></label>
+            <input type="range"id="plateauSmoothing" name="plateauSmoothing" min="0.01" max="0.5" value="0.1" step="0.01">
+            <label for="valleyDepthFactor">Valley Depth: <span id="valleyDepthFactorVal">1.5</span></label>
+            <input type="range" id="valleyDepthFactor" name="valleyDepthFactor" min="1.0" max="5.0" value="1.5" step="0.1">
+            <label for="valleyThreshold">Valley Thresh: <span id="valleyThresholdVal">-0.2</span></label>
+            <input type="range" id="valleyThreshold" name="valleyThreshold" min="-1" max="0" value="-0.2" step="0.05">
+            <label for="waterLevel">Water Level: <span id="waterLevelVal">0</span>m</label>
+            <input type="range" id="waterLevel" name="waterLevel" min="-50" max="50" value="0" step="1">
+        </div>
+        
+        <div class="control-group">
+            <h3>Grid Settings</h3>
+            <div class="flex-row align-center mb-10">
+                <label for="showGridInput" class="mr-5 mb-0">Show Grid: </label>
+                <input type="checkbox" id="showGridInput" class="mb-0">
+                <label for="snapYToGridInput" class="ml-15 mr-5 mb-0">Snap Y Offset: </label>
+                <input type="checkbox" id="snapYToGridInput" class="mb-0">
+            </div>
+            <label for="gridCellSize">Cell Size: <span id="gridCellSizeVal">10</span>m</label>
+            <input type="range" id="gridCellSize" name="gridCellSize" min="5" max="100" value="10" step="5">
+            <label for="gridDisplaySize">Grid Size: <span id="gridDisplaySizeVal">1000</span>m</label>
+            <input type="range" id="gridDisplaySize" name="gridDisplaySize" min="100" max="2000" value="1000" step="100">
+            <label for="gridColorCenter">Center Line Color:</label>
+            <input type="color" id="gridColorCenter" value="#444444">
+            <label for="gridColorLines">Grid Line Color:</label>
+            <input type="color" id="gridColorLines" value="#888888">
+            <label for="gridOpacity">Grid Opacity: <span id="gridOpacityVal">0.2</span></label>
+            <input type="range" id="gridOpacity" name="gridOpacity" min="0" max="1" value="0.2" step="0.05">
+        </div>
+
+        <div class="control-group">
+            <h3>Camera Controls</h3>
+            <button id="resetCameraButton">Reset Camera</button>
+            <label for="minDistance">Min Zoom: <span id="minDistanceVal">20</span>m</label>
+            <input type="range" id="minDistance" name="minDistance" min="1" max="100" value="20" step="1">
+            <label for="maxDistance">Max Zoom: <span id="maxDistanceVal">500</span>m</label>
+            <input type="range" id="maxDistance" name="maxDistance" min="100" max="1000" value="500" step="10">
+            <div style="margin-top:10px;">
+                <input type="checkbox" id="lockCameraToBrush">
+                <label for="lockCameraToBrush">Lock Camera to Brush</label>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>Tools (for Active Terrain)</h3>
+            <button class="tool-button" id="navigateToolButton" data-tool="NONE">Navigate</button>
+            <button class="tool-button" id="moveTerrainToolButton" data-tool="MOVE_TERRAIN">Move Active Terrain</button>
+            <hr class="mt-10 mb-10"/>
+            <label for="brushSize">Brush Size: <span id="brushSizeVal">10</span>m</label>
+            <input type="range" id="brushSize" name="brushSize" min="1" max="50" value="10" step="1">
+            <label for="sculptStrength" class="mt-10">Sculpt Strength: <span id="sculptStrengthVal">0.5</span>m</label>
+            <input type="range" id="sculptStrength" name="sculptStrength" min="0.1" max="2" value="0.5" step="0.1">
+            <div class="button-row">
+                <button class="tool-button" data-tool="SCULPT_RAISE">Raise</button>
+                <button class="tool-button" data-tool="SCULPT_LOWER">Lower</button>
+            </div>
+            <div class="button-row">
+                <button class="tool-button" data-tool="SCULPT_SMOOTH">Smooth</button> <button class="tool-button" data-tool="SCULPT_FLATTEN">Flatten</button> </div>
+            <hr class="mt-10 mb-10"/>
+            <div class="button-row">
+                <button class="tool-button" data-tool="PAINT" data-type="GRASS">Grass</button>
+                <button class="tool-button" data-tool="PAINT" data-type="SAND">Sand</button>
+            </div>
+            <div class="button-row">
+                <button class="tool-button" data-tool="PAINT" data-type="ROCK">Rock</button>
+                <button class="tool-button" data-tool="PAINT" data-type="SNOW">Snow</button>
+            </div>
+               <div class="button-row">
+                <button class="tool-button" data-tool="PAINT" data-type="LAVA">Lava</button>
+                <button class="tool-button" data-tool="PAINT" data-type="GRAVEL">Gravel</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>Object Placement Tools</h3>
+            <label for="objectPlacementScale">Object Scale: <span id="objectPlacementScaleVal">1.0</span></label>
+            <input type="range" id="objectPlacementScale" name="objectPlacementScale" min="0.1" max="5.0" value="1.0" step="0.1">
+            <div class="button-row">
+                <button class="tool-button" data-tool="PLACE_OBJECT" data-object-type="TREE">Place Tree</button>
+                <button class="tool-button" data-tool="PLACE_OBJECT" data-object-type="ROCK_OBJ">Place Rock</button>
+            </div>
+            <button id="clearAllPlacedObjectsButton" class="secondary">Clear All Placed Objects</button>
+        </div>
+
+        <div class="control-group">
+            <h3>Undo / Redo</h3>
+            <div class="button-row">
+                <button id="undoButton" disabled>Undo</button>
+                <button id="redoButton" disabled>Redo</button>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>World Management</h3>
+            <label for="addTerrainInput" class="file-input-label secondary">Add Terrain From File</label>
+            <input type="file" id="addTerrainInput" accept=".json">
+            <button id="regenerateActiveButton" class="action-button">Regenerate Active Terrain</button>
+            <button id="saveActiveTerrainButton" class="secondary">Save Active Terrain</button>
+            <hr class="mt-10 mb-10"/>
+            <label for="loadWorldInput" class="file-input-label">Load World</label>
+            <input type="file" id="loadWorldInput" accept=".world.json">
+            <button id="saveWorldButton" class="secondary">Save World</button>
+            <div id="worldTerrainList" class="terrain-list">
+  <div class="terrain-list__item">
+    <span class="list-item-id">T1 (t_init)</span>
+    <label class="terrain-list__label" for="terrain-x-1">X:
+      <input id="terrain-x-1" name="terrain-x-1" type="number" class="terrain-list__input">
+    </label>
+    <label class="terrain-list__label" for="terrain-y-1">Y:
+      <input id="terrain-y-1" name="terrain-y-1" type="number" class="terrain-list__input">
+    </label>
+    <label class="terrain-list__label" for="terrain-z-1">Z:
+      <input id="terrain-z-1" name="terrain-z-1" type="number" class="terrain-list__input">
+    </label>
+    <button class="btn btn--action">Set Active</button>
+    <button class="btn btn--remove">Remove</button>
+  </div>
+</div>
+        </div>
+    </div>
+
+    <div id="loading-indicator">Generating Terrain...</div>
+    <div id="gemini-loading-indicator">✨ Generating Lore...</div>
+
+    <div id="loreModal" class="modal"> <div class="modal-content"> <div class="modal-header"> <span class="close-button" id="closeLoreModal">&times;</span> <h2>Terrain Lore</h2> </div> <div class="modal-body"> <p id="loreText">Loading lore...</p> </div> </div> </div>
+    <div id="info">Double-click terrain to focus. Left-click to paint/sculpt/move/place objects. Right-click to pan. (Units are in meters)</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="js/simplexnoise-loader.js"></script>
+    <script type="module" src="js/main.js"></script>
+    <script>
+    // --- Brush Tool Camera & Visual Enhancements ---
+    let brushVisual = null;
+    let lockCameraToBrush = false;
+    let lastBrushPoint = null;
+    let brushSize = 10;
+    let sculptStrength = 0.5;
+    // Wait for Three.js and scene to be ready
+    function getSceneVars() {
+        return window.THREE && window.worldTerrains && window.worldTerrains[window.activeTerrainIndex ?? 0] && window.renderer && window.camera && window.controls && window.scene;
+    }
+    function createBrushVisual() {
+        if (!window.scene || !window.THREE) return;
+        if (brushVisual) window.scene.remove(brushVisual);
+        const geometry = new window.THREE.CircleGeometry(brushSize, 48);
+        geometry.rotateX(-Math.PI / 2);
+        const material = new window.THREE.MeshBasicMaterial({ color: 0x00ff00, opacity: 0.25, transparent: true, depthWrite: false });
+        brushVisual = new window.THREE.Mesh(geometry, material);
+        brushVisual.renderOrder = 999;
+        brushVisual.visible = false;
+        window.scene.add(brushVisual);
+    }
+    function updateBrushVisual(position, size) {
+        if (!brushVisual) createBrushVisual();
+        brushVisual.position.copy(position);
+        brushVisual.scale.set(size / brushSize, 1, size / brushSize);
+        brushVisual.visible = true;
+    }
+    function hideBrushVisual() {
+        if (brushVisual) brushVisual.visible = false;
+    }
+    // Listen for lock camera toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        const lockCameraCheckbox = document.getElementById('lockCameraToBrush');
+        if (lockCameraCheckbox) {
+            lockCameraCheckbox.addEventListener('change', (e) => {
+                lockCameraToBrush = e.target.checked;
+            });
+        }
+    });
+    // Keyboard/mouse wheel shortcuts for brush size/strength
+    window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === '[' || e.key === '-') {
+            brushSize = Math.max(1, brushSize - 1);
+            const slider = document.getElementById('brushSize');
+            if (slider) slider.value = brushSize;
+            createBrushVisual();
+        } else if (e.key === ']' || e.key === '+') {
+            brushSize = Math.min(50, brushSize + 1);
+            const slider = document.getElementById('brushSize');
+            if (slider) slider.value = brushSize;
+            createBrushVisual();
+        }
+    });
+    window.addEventListener('wheel', (e) => {
+        if (e.shiftKey) {
+            e.preventDefault();
+            sculptStrength = Math.max(0.1, Math.min(2, sculptStrength + (e.deltaY < 0 ? 0.05 : -0.05)));
+            const slider = document.getElementById('sculptStrength');
+            if (slider) slider.value = sculptStrength;
+        }
+    }, { passive: false });
+    // Patch mouse handlers for brush visual and camera snap/follow
+    function patchBrushCameraHandlers() {
+        if (!getSceneVars()) { setTimeout(patchBrushCameraHandlers, 200); return; }
+        const renderer = window.renderer;
+        const camera = window.camera;
+        const controls = window.controls;
+        const scene = window.scene;
+        const raycaster = new window.THREE.Raycaster();
+        const mouse = new window.THREE.Vector2();
+        const getActiveTerrain = () => window.worldTerrains[window.activeTerrainIndex ?? 0];
+        function getBrushPoint(event) {
+            mouse.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            const terrain = getActiveTerrain();
+            if (!terrain?.mesh) return null;
+            raycaster.setFromCamera(mouse, camera);
+            const intersections = raycaster.intersectObject(terrain.mesh);
+            return intersections.length > 0 ? intersections[0].point : null;
+        }
+        renderer.domElement.addEventListener('mousemove', (event) => {
+            const toolMode = window.ui?.getToolState?.().currentToolMode;
+            if ([window.TOOL_MODES?.PAINT, window.TOOL_MODES?.SCULPT_RAISE, window.TOOL_MODES?.SCULPT_LOWER, window.TOOL_MODES?.SCULPT_SMOOTH, window.TOOL_MODES?.SCULPT_FLATTEN].includes(toolMode)) {
+                const point = getBrushPoint(event);
+                if (point) {
+                    updateBrushVisual(point, brushSize);
+                    lastBrushPoint = point.clone();
+                    if (lockCameraToBrush && controls) controls.target.lerp(point, 0.3);
+                } else {
+                    hideBrushVisual();
+                }
+            } else {
+                hideBrushVisual();
+            }
+        });
+        renderer.domElement.addEventListener('mousedown', (event) => {
+            const toolMode = window.ui?.getToolState?.().currentToolMode;
+            if ([window.TOOL_MODES?.PAINT, window.TOOL_MODES?.SCULPT_RAISE, window.TOOL_MODES?.SCULPT_LOWER, window.TOOL_MODES?.SCULPT_SMOOTH, window.TOOL_MODES?.SCULPT_FLATTEN].includes(toolMode) && controls) {
+                const point = getBrushPoint(event);
+                if (point) {
+                    controls.target.copy(point);
+                    controls.update();
+                }
+            }
+        });
+    }
+    setTimeout(patchBrushCameraHandlers, 800); // Wait for scene/renderer to be ready
+    </script>
+</body>
+</html>
